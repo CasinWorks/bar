@@ -47,13 +47,28 @@ class SummaryScreen extends StatelessWidget {
                         _Row('Branch', session.branch),
                         _Row('Pass', '${session.purchasedSeconds ~/ 60} minutes'),
                         _Row('Paid', '₱${session.amountPaid}'),
-                        _Row('Time remaining', state.formatDuration(session.remainingSeconds)),
+                        _Row(
+                          'Time remaining',
+                          state.formatDuration(
+                            session.remainingSeconds > 0
+                                ? session.remainingSeconds
+                                : state.timeBalance,
+                          ),
+                        ),
                         _Row('Drinks ordered', '${session.drinksOrdered}'),
                         if (session.enteredAt != null)
                           _Row('Entered', _formatTime(session.enteredAt!)),
                         if (session.exitedAt != null)
                           _Row('Exited', _formatTime(session.exitedAt!)),
                       ],
+                    ),
+                  )
+                else
+                  LuxuryCard(
+                    child: Text(
+                      'Visit details are still syncing…',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 const Spacer(),

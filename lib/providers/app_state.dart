@@ -252,9 +252,31 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _completeVisitFromStore(ClubSessionRecord session) async {
-    await _bankTimeForCompletedVisit(SessionPhase.awaitingExitScan, session);
-    _session = null;
+    _timer?.cancel();
+    _qrRefreshTimer?.cancel();
+    _syncTimer?.cancel();
+
+    // Keep the completed visit for SummaryScreen — clearing it made the
+    // checkout receipt flash then go blank.
+    session.phase = SessionPhase.completed;
+    session.remainingSeconds = timeBalance;
+    session.drinksOrdered = _drinksOrdered;
+    _session = session;
     _currentQr = null;
+    notifyListeners();
+
+    _localTimeMutations++;
+    try {
+      await _bankTimeForCompletedVisit(SessionPhase.awaitingExitScan, session);
+      // Flush/refresh must not trigger the cash-desk celebration overlay.
+      _pendingWalletCredit = null;
+      session.remainingSeconds = timeBalance;
+      _session = session;
+    } finally {
+      _localTimeMutations = mathMax(0, _localTimeMutations - 1);
+    }
+
+    await _sessionStore.subscribeToSession(null);
     notifyListeners();
   }
 

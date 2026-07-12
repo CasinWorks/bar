@@ -167,7 +167,7 @@ class ExitGateScreen extends StatelessWidget {
 
     if (session == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/');
+        if (context.mounted) context.go('/pricing');
       });
       return const SizedBox.shrink();
     }
