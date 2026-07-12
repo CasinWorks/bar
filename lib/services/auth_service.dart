@@ -306,12 +306,13 @@ class AuthService {
     } catch (_) {
       final metadata = authUser.userMetadata ?? {};
       try {
+        // Never include `role` here — upsert would overwrite admin/hr/staff
+        // back to member and lock you out of the admin console.
         await _client!.from('profiles').upsert({
           'id': authUser.id,
           'name': metadata['name'] ?? '',
           'email': authUser.email ?? '',
           'birthdate': metadata['birthdate'],
-          'role': metadata['role'] ?? UserRole.member.name,
         });
       } catch (e) {
         throw AuthException(_mapSupabaseError(e));

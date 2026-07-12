@@ -127,7 +127,9 @@ class _TimeRefillDialogState extends State<_TimeRefillDialog>
                 Text(
                   widget.subtitle!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 11,
+                        fontSize: 12,
+                        color: AppColors.goldBright.withValues(alpha: 0.85),
+                        letterSpacing: 0.3,
                       ),
                   textAlign: TextAlign.center,
                 ),

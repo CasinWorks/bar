@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (!loading && profile) return <Navigate to="/" replace />;
+  if (!loading && profile) return <Navigate to="/app" replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -39,6 +39,11 @@ export default function LoginPage() {
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+        <p className="page-sub" style={{ marginTop: 16, marginBottom: 0 }}>
+          <Link to="/" style={{ color: 'var(--gold, #c5a059)' }}>
+            ← Back to welcome
+          </Link>
+        </p>
       </div>
     </div>
   );

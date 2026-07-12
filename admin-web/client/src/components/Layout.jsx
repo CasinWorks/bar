@@ -2,12 +2,12 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const links = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/time-load', label: 'Load Time (Cash)' },
-  { to: '/users', label: 'Members & Access' },
-  { to: '/events', label: 'Calendar & Events' },
-  { to: '/guests', label: 'Guest List' },
-  { to: '/hr', label: 'HR & Employment' },
+  { to: '/app', label: 'Dashboard', end: true },
+  { to: '/app/time-load', label: 'Load Time (Cash)' },
+  { to: '/app/users', label: 'Members & Access' },
+  { to: '/app/events', label: 'Calendar & Events' },
+  { to: '/app/guests', label: 'Guest List' },
+  { to: '/app/hr', label: 'HR & Employment' },
 ];
 
 export default function Layout() {

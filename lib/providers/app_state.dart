@@ -53,6 +53,8 @@ class AppState extends ChangeNotifier {
   QrPayload? _currentQr;
   int _timerSyncDebt = 0;
   int _drinksOrdered = 0;
+  int _localTimeMutations = 0;
+  PendingWalletCredit? _pendingWalletCredit;
 
   AvatarConfig _avatar = const AvatarConfig();
   int _points = 108;
@@ -79,6 +81,7 @@ class AppState extends ChangeNotifier {
   int get timeRemaining => timeBalance;
 
   int get drinksOrdered => _drinksOrdered;
+  PendingWalletCredit? get pendingWalletCredit => _pendingWalletCredit;
   Duration get remaining => Duration(seconds: timeRemaining);
   AvatarConfig get avatar => _avatar;
   int get points => _points;
@@ -306,10 +309,56 @@ class AppState extends ChangeNotifier {
     if (!usesCloud || _user == null) return;
 
     _auth.startProfileCurrencyWatch((user) {
-      _user = user;
-      notifyListeners();
+      unawaited(_onRemoteProfileCurrency(user));
     });
   }
+
+  /// Live desk / admin credits — celebrate meaningful increases from the cloud.
+  Future<void> _onRemoteProfileCurrency(MemberUser user) async {
+    final prev = _user?.timeBalanceSeconds ?? 0;
+    final next = user.timeBalanceSeconds;
+    final delta = next - prev;
+
+    // Local timer ticks + sync debt: ignore tiny drift; apply real credits.
+    if (delta.abs() <= 3 && _timerSyncDebt > 0 && _localTimeMutations == 0) {
+      return;
+    }
+
+    if (delta > 3 && _localTimeMutations == 0) {
+      _pendingWalletCredit = PendingWalletCredit(
+        fromSeconds: prev,
+        toSeconds: next,
+        title: 'TIME LANDED',
+        subtitle: 'Cash desk · wallet updated live',
+      );
+      _timerSyncDebt = 0;
+    }
+
+    _user = user;
+
+    if (delta > 3) {
+      _resumeTimerIfNeeded();
+    }
+
+    notifyListeners();
+  }
+
+  void clearPendingWalletCredit() {
+    if (_pendingWalletCredit == null) return;
+    _pendingWalletCredit = null;
+    notifyListeners();
+  }
+
+  Future<T> _withLocalTimeMutation<T>(Future<T> Function() action) async {
+    _localTimeMutations++;
+    try {
+      return await action();
+    } finally {
+      _localTimeMutations = mathMax(0, _localTimeMutations - 1);
+    }
+  }
+
+  static int mathMax(int a, int b) => a > b ? a : b;
 
   void _stopCurrencyRealtime() {
     _auth.stopProfileCurrencyWatch();
@@ -575,7 +624,7 @@ class AppState extends ChangeNotifier {
 
     if (result == PaymentResult.success) {
       final seconds = _selectedTier.duration * 60;
-      _user = await _auth.addTimeBalance(seconds);
+      _user = await _withLocalTimeMutation(() => _auth.addTimeBalance(seconds));
 
       final sessionId = _uuid.v4();
       _session = ClubSessionRecord(
@@ -635,7 +684,7 @@ class AppState extends ChangeNotifier {
 
     if (result == PaymentResult.success && _session != null) {
       final added = _selectedTier.duration * 60;
-      _user = await _auth.addTimeBalance(added);
+      _user = await _withLocalTimeMutation(() => _auth.addTimeBalance(added));
       _session!.purchasedSeconds += added;
       _session!.amountPaid += _selectedTier.discountedPrice;
       await _sessionStore.upsert(_session!);
@@ -656,7 +705,7 @@ class AppState extends ChangeNotifier {
 
     if (result == PaymentResult.success && _session != null) {
       final added = _selectedTier.duration * 60;
-      _user = await _auth.addTimeBalance(added);
+      _user = await _withLocalTimeMutation(() => _auth.addTimeBalance(added));
       _session!.purchasedSeconds += added;
       _session!.amountPaid += _selectedTier.discountedPrice;
       await _sessionStore.upsert(_session!);
@@ -677,7 +726,7 @@ class AppState extends ChangeNotifier {
     if (result != PaymentResult.success) return result;
 
     final seconds = minutes * 60;
-    _user = await _auth.addTimeBalance(seconds);
+    _user = await _withLocalTimeMutation(() => _auth.addTimeBalance(seconds));
 
     notifyListeners();
     return result;
@@ -1079,4 +1128,19 @@ class AppState extends ChangeNotifier {
     _sessionStore.removeListener(_onSessionStoreChanged);
     super.dispose();
   }
+}
+
+
+class PendingWalletCredit {
+  const PendingWalletCredit({
+    required this.fromSeconds,
+    required this.toSeconds,
+    this.title,
+    this.subtitle,
+  });
+
+  final int fromSeconds;
+  final int toSeconds;
+  final String? title;
+  final String? subtitle;
 }

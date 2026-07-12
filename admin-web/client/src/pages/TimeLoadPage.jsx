@@ -57,7 +57,9 @@ export default function TimeLoadPage() {
         paymentMethod === 'complimentary'
           ? `${result.totalMinutes} min comp`
           : `${formatPeso(result.totalPeso)} collected`;
-      setMsg(`Loaded ${result.totalMinutes} min — ${tender}`);
+      setMsg(
+        `Loaded ${result.totalMinutes} min — ${tender}. Member phone updates live.`,
+      );
       setNotes('');
       setBillCount(1);
       await refresh();

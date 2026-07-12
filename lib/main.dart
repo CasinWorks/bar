@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/wallet_credit_celebration_host.dart';
 import 'providers/app_state.dart';
 import 'router/app_router.dart';
 
@@ -58,6 +59,11 @@ class _BlindTigerAppState extends State<BlindTigerApp> {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         routerConfig: _router,
+        builder: (context, child) {
+          return WalletCreditCelebrationHost(
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
       ),
     );
   }
