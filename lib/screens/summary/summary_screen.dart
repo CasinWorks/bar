@@ -11,7 +11,7 @@ class SummaryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final session = state.session;
+    final session = state.checkoutReceipt ?? state.session;
 
     return Scaffold(
       body: LatticeBackground(

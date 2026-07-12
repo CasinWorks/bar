@@ -167,12 +167,17 @@ class ExitGateScreen extends StatelessWidget {
 
     if (session == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/pricing');
+        if (!context.mounted) return;
+        if (state.hasCheckoutReceipt) {
+          context.go('/summary');
+        } else {
+          context.go('/pricing');
+        }
       });
       return const SizedBox.shrink();
     }
 
-    if (state.sessionPhase == SessionPhase.completed) {
+    if (state.sessionPhase == SessionPhase.completed || state.hasCheckoutReceipt) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/summary');
       });

@@ -59,6 +59,8 @@ class AppState extends ChangeNotifier {
   int _drinksOrdered = 0;
   int _localTimeMutations = 0;
   PendingWalletCredit? _pendingWalletCredit;
+  /// Frozen receipt after exit scan — survives until [beginNewVisit].
+  ClubSessionRecord? _checkoutReceipt;
 
   AvatarConfig _avatar = const AvatarConfig();
   int _points = 108;
@@ -74,8 +76,13 @@ class AppState extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   bool get isStaff => _user?.isStaff ?? false;
   bool get isMember => _user?.isMember ?? false;
-  ClubSessionRecord? get session => _session;
-  SessionPhase get sessionPhase => _session?.phase ?? SessionPhase.none;
+  ClubSessionRecord? get session => _session ?? _checkoutReceipt;
+  bool get hasCheckoutReceipt => _checkoutReceipt != null;
+  ClubSessionRecord? get checkoutReceipt => _checkoutReceipt;
+  SessionPhase get sessionPhase {
+    if (_checkoutReceipt != null) return SessionPhase.completed;
+    return _session?.phase ?? SessionPhase.none;
+  }
   PriceTier get selectedTier => _selectedTier;
   int get selectedTimeMinutes => _selectedTimeMinutes;
   String get selectedTimePackageId => _selectedTimePackageId;
@@ -241,8 +248,10 @@ class AppState extends ChangeNotifier {
       _timer?.cancel();
       _qrRefreshTimer?.cancel();
       _syncTimer?.cancel();
-      _completeVisitFromStore(updated);
+      // Capture receipt immediately (sync) so routing never loses the summary.
+      _captureCheckoutReceipt(updated);
       notifyListeners();
+      unawaited(_finalizeCheckoutReceipt(updated));
       return;
     }
 
@@ -255,32 +264,44 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _completeVisitFromStore(ClubSessionRecord session) async {
-    _timer?.cancel();
-    _qrRefreshTimer?.cancel();
-    _syncTimer?.cancel();
-
-    // Keep the completed visit for SummaryScreen — clearing it made the
-    // checkout receipt flash then go blank.
-    session.phase = SessionPhase.completed;
-    session.remainingSeconds = timeBalance;
-    session.drinksOrdered = _drinksOrdered;
-    _session = session;
+  void _captureCheckoutReceipt(ClubSessionRecord session) {
+    _checkoutReceipt = ClubSessionRecord(
+      id: session.id,
+      memberId: session.memberId,
+      memberName: session.memberName.isNotEmpty
+          ? session.memberName
+          : (_user?.name ?? 'Guest'),
+      purchasedSeconds: session.purchasedSeconds,
+      amountPaid: session.amountPaid,
+      branch: session.branch,
+      phase: SessionPhase.completed,
+      remainingSeconds: timeBalance,
+      drinksOrdered: session.drinksOrdered > 0 ? session.drinksOrdered : _drinksOrdered,
+      enteredAt: session.enteredAt,
+      exitedAt: session.exitedAt ?? DateTime.now(),
+    );
+    _session = _checkoutReceipt;
     _currentQr = null;
-    notifyListeners();
+  }
 
+  Future<void> _finalizeCheckoutReceipt(ClubSessionRecord session) async {
     _localTimeMutations++;
     try {
       await _bankTimeForCompletedVisit(SessionPhase.awaitingExitScan, session);
-      // Flush/refresh must not trigger the cash-desk celebration overlay.
       _pendingWalletCredit = null;
-      session.remainingSeconds = timeBalance;
-      _session = session;
+      if (_checkoutReceipt != null) {
+        _checkoutReceipt!.remainingSeconds = timeBalance;
+        _session = _checkoutReceipt;
+      }
+    } catch (_) {
+      // Receipt already captured — never drop the summary on bank/sync errors.
     } finally {
       _localTimeMutations = mathMax(0, _localTimeMutations - 1);
     }
 
-    await _sessionStore.subscribeToSession(null);
+    try {
+      await _sessionStore.subscribeToSession(null);
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -400,6 +421,7 @@ class AppState extends ChangeNotifier {
     await _auth.logout();
     _user = null;
     _session = null;
+    _checkoutReceipt = null;
     _currentQr = null;
     _drinksOrdered = 0;
     _loungeInitialized = false;
@@ -590,6 +612,7 @@ class AppState extends ChangeNotifier {
     _syncTimer?.cancel();
     _sessionStore.unsubscribe();
     _session = null;
+    _checkoutReceipt = null;
     _currentQr = null;
     _drinksOrdered = 0;
     _loungeInitialized = false;

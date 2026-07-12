@@ -64,11 +64,9 @@ class AppRouter {
         if (phase == SessionPhase.awaitingExitScan && loc != '/exit' && !buyTimeRoutes) {
           return '/exit';
         }
-        if (phase == SessionPhase.completed &&
-            loc != '/summary' &&
-            loc != '/pricing' &&
-            loc != '/checkout' &&
-            !buyTimeRoutes) {
+        // Exit scan complete — lock on summary until the guest starts a new visit.
+        if ((phase == SessionPhase.completed || app.hasCheckoutReceipt) &&
+            loc != '/summary') {
           return '/summary';
         }
         if (phase == SessionPhase.none && loc == '/lounge') {
