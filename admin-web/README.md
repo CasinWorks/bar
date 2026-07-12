@@ -100,8 +100,59 @@ Open **http://localhost:5173** and sign in with your admin account.
 
 Banned members cannot log in to the mobile app.
 
+## Deploy to Vercel
+
+The admin console (React UI + Express API) deploys as **one Vercel project** from the `admin-web/` folder.
+
+### 1. Import the repo
+
+1. Go to [vercel.com/new](https://vercel.com/new)
+2. Import **CasinWorks/bar**
+3. Set **Root Directory** to `admin-web`
+4. Framework Preset: **Other** (vercel.json is already configured)
+
+### 2. Environment variables
+
+In **Project Settings → Environment Variables**, add for Production (and Preview if you want):
+
+| Name | Value |
+|------|--------|
+| `SUPABASE_URL` | `https://YOUR_PROJECT.supabase.co` |
+| `SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase **service role** key (server only) |
+| `CLIENT_ORIGIN` | your Vercel URL, e.g. `https://bar-xxx.vercel.app` |
+| `VITE_SUPABASE_URL` | same as `SUPABASE_URL` |
+| `VITE_SUPABASE_ANON_KEY` | same as `SUPABASE_ANON_KEY` |
+
+Do **not** set `VITE_API_URL` on Vercel — the UI calls `/api` on the same domain.
+
+### 3. Supabase Auth allowlist
+
+In Supabase → **Authentication → URL Configuration**:
+
+- **Site URL**: your Vercel URL
+- **Redirect URLs**: add `https://YOUR_PROJECT.vercel.app/**`
+
+### 4. Deploy
+
+Click **Deploy**. After it finishes:
+
+- Admin UI: `https://YOUR_PROJECT.vercel.app`
+- Health: `https://YOUR_PROJECT.vercel.app/api/health`
+
+### CLI alternative
+
+```bash
+cd admin-web
+npx vercel login
+npx vercel          # preview
+npx vercel --prod   # production
+```
+
+Paste the same env vars when prompted (or set them in the dashboard first).
+
 ## Production notes
 
-- Build client: `cd client && npm run build` → serve `dist/` behind HTTPS.
-- Run API with `npm start` and set `CLIENT_ORIGIN` to your production URL.
-- Restrict admin URLs (VPN or IP allowlist) for the pilot.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` to the browser — it stays in Vercel server env only.
+- Restrict who has admin/hr roles in Supabase.
+- For a tighter pilot lock-down, put the Vercel URL behind password protection (Vercel Deployment Protection) or VPN.

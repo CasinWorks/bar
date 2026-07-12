@@ -1,29 +1,53 @@
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 
-const url = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const anonKey = process.env.SUPABASE_ANON_KEY;
-
-if (!url || !serviceKey || !anonKey) {
-  throw new Error(
-    'Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ANON_KEY. ' +
-      'Copy .env.example to .env and fill in real values from Supabase project settings.',
-  );
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `Missing ${name}. Set it in Vercel Project Settings → Environment Variables, ` +
+        'or in admin-web/server/.env for local development.',
+    );
+  }
+  return value;
 }
 
-// Supabase Realtime requires a WebSocket implementation on Node < 22.
-// The admin API doesn't need realtime, but supabase-js initializes it by default.
-// Providing ws avoids runtime crashes on Node 20.
-if (typeof globalThis.WebSocket === 'undefined') {
-  globalThis.WebSocket = ws;
+function getClients() {
+  const url = requireEnv('SUPABASE_URL');
+  const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const anonKey = requireEnv('SUPABASE_ANON_KEY');
+
+  if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = ws;
+  }
+
+  return {
+    supabaseAdmin: createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }),
+    anonKey,
+    url,
+  };
 }
 
-export const supabaseAdmin = createClient(url, serviceKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+let cached;
+
+function clients() {
+  if (!cached) cached = getClients();
+  return cached;
+}
+
+export const supabaseAdmin = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      return clients().supabaseAdmin[prop];
+    },
+  },
+);
 
 export function supabaseAsUser(jwt) {
+  const { url, anonKey } = clients();
   return createClient(url, anonKey, {
     global: { headers: { Authorization: `Bearer ${jwt}` } },
     auth: { autoRefreshToken: false, persistSession: false },
