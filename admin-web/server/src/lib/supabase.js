@@ -12,7 +12,13 @@ function requireEnv(name) {
   return value;
 }
 
-function getClients() {
+let cachedAdmin = null;
+let cachedUrl = null;
+let cachedAnonKey = null;
+
+function ensureClients() {
+  if (cachedAdmin) return;
+
   const url = requireEnv('SUPABASE_URL');
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
   const anonKey = requireEnv('SUPABASE_ANON_KEY');
@@ -21,34 +27,31 @@ function getClients() {
     globalThis.WebSocket = ws;
   }
 
-  return {
-    supabaseAdmin: createClient(url, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    }),
-    anonKey,
-    url,
-  };
+  cachedUrl = url;
+  cachedAnonKey = anonKey;
+  cachedAdmin = createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
-let cached;
-
-function clients() {
-  if (!cached) cached = getClients();
-  return cached;
-}
-
-export const supabaseAdmin = new Proxy(
-  {},
-  {
-    get(_target, prop) {
-      return clients().supabaseAdmin[prop];
-    },
+export const supabaseAdmin = {
+  from(...args) {
+    ensureClients();
+    return cachedAdmin.from(...args);
   },
-);
+  get auth() {
+    ensureClients();
+    return cachedAdmin.auth;
+  },
+  rpc(...args) {
+    ensureClients();
+    return cachedAdmin.rpc(...args);
+  },
+};
 
 export function supabaseAsUser(jwt) {
-  const { url, anonKey } = clients();
-  return createClient(url, anonKey, {
+  ensureClients();
+  return createClient(cachedUrl, cachedAnonKey, {
     global: { headers: { Authorization: `Bearer ${jwt}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });

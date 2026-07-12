@@ -53,7 +53,13 @@ export function AuthProvider({ children }) {
       if (error) throw error;
       const nextProfile = await loadProfile(data.session.access_token);
       if (!nextProfile) {
-        throw new Error('Admin or HR role required. Your account signed in, but is not admin/hr.');
+        // Re-read last error from a direct call for a precise message
+        try {
+          await api('/api/dashboard/me', { token: data.session.access_token });
+        } catch (apiErr) {
+          throw new Error(apiErr.message || 'Admin or HR role required.');
+        }
+        throw new Error('Admin or HR role required.');
       }
       return data;
     },
