@@ -1,19 +1,31 @@
-const API_URL =
-  import.meta.env.VITE_API_URL !== undefined
-    ? import.meta.env.VITE_API_URL
-    : import.meta.env.PROD
-      ? ''
-      : 'http://localhost:4000';
+function resolveApiUrl() {
+  const raw = import.meta.env.VITE_API_URL;
+  // Never ship a localhost API URL in production (causes browser "Load failed").
+  if (import.meta.env.PROD) {
+    if (!raw || raw.includes('localhost') || raw.includes('127.0.0.1')) return '';
+    return raw;
+  }
+  return raw || 'http://localhost:4000';
+}
+
+const API_URL = resolveApiUrl();
 
 export async function api(path, { method = 'GET', body, token } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    throw new Error(
+      `Network error talking to API (${API_URL || 'same-origin'}${path}): ${e.message}`,
+    );
+  }
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
