@@ -14,6 +14,8 @@ class AnimatedTimeDisplay extends StatefulWidget {
     this.fontWeight = FontWeight.w900,
     this.letterSpacing = 2,
     this.onAnimationComplete,
+    /// When true, count down spends (used by ROUND POURED / TIME SPENT overlays).
+    this.animateDecreases = false,
   });
 
   final int seconds;
@@ -23,6 +25,7 @@ class AnimatedTimeDisplay extends StatefulWidget {
   final FontWeight fontWeight;
   final double letterSpacing;
   final VoidCallback? onAnimationComplete;
+  final bool animateDecreases;
 
   @override
   State<AnimatedTimeDisplay> createState() => _AnimatedTimeDisplayState();
@@ -34,6 +37,7 @@ class _AnimatedTimeDisplayState extends State<AnimatedTimeDisplay>
   late Animation<double> _tween;
   late int _from;
   late int _to;
+  bool _completionNotified = false;
 
   @override
   void initState() {
@@ -45,13 +49,19 @@ class _AnimatedTimeDisplayState extends State<AnimatedTimeDisplay>
     _tween = AlwaysStoppedAnimation(start.toDouble());
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        widget.onAnimationComplete?.call();
+        _notifyComplete();
       }
     });
 
     if (widget.initialSeconds != null && widget.initialSeconds != widget.seconds) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _animateTo(widget.seconds);
+      });
+    } else if (widget.initialSeconds != null &&
+        widget.initialSeconds == widget.seconds) {
+      // Nothing to animate — still release any waiting overlay.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _notifyComplete();
       });
     }
   }
@@ -60,29 +70,40 @@ class _AnimatedTimeDisplayState extends State<AnimatedTimeDisplay>
   void didUpdateWidget(AnimatedTimeDisplay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.seconds != widget.seconds) {
+      _completionNotified = false;
       _animateTo(widget.seconds);
     }
+  }
+
+  void _notifyComplete() {
+    if (_completionNotified) return;
+    _completionNotified = true;
+    widget.onAnimationComplete?.call();
+  }
+
+  void _snapTo(int target) {
+    _tween = AlwaysStoppedAnimation(target.toDouble());
+    _controller.stop();
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notifyComplete();
+    });
   }
 
   void _animateTo(int target) {
     _from = _tween.value.round();
     _to = target;
     final delta = _to - _from;
-    if (delta == 0) return;
-
-    // Per-second lounge countdown — update instantly.
-    if (delta <= 0 || delta.abs() < 5) {
-      _tween = AlwaysStoppedAnimation(_to.toDouble());
-      _controller.stop();
-      setState(() {});
+    if (delta == 0) {
+      _snapTo(_to);
       return;
     }
 
-    // Only animate time being added — decreases snap to avoid false spend loops.
-    if (delta < 0) {
-      _tween = AlwaysStoppedAnimation(_to.toDouble());
-      _controller.stop();
-      setState(() {});
+    // Lounge ticker / tiny drift — snap, but always complete so overlays dismiss.
+    final shouldAnimateDecrease = widget.animateDecreases && delta < 0;
+    final shouldAnimateIncrease = delta > 0 && delta.abs() >= 5;
+    if (!shouldAnimateDecrease && !shouldAnimateIncrease) {
+      _snapTo(_to);
       return;
     }
 

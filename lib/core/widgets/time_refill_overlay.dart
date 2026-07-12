@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../utils/time_animation.dart';
@@ -17,7 +19,9 @@ class TimeRefillOverlay {
 
     await showGeneralDialog<void>(
       context: context,
-      barrierDismissible: false,
+      useRootNavigator: true,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
       barrierColor: Colors.black.withValues(alpha: 0.88),
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (ctx, _, _) => _TimeRefillDialog(
@@ -63,6 +67,7 @@ class _TimeRefillDialogState extends State<_TimeRefillDialog>
   late final AnimationController _pulse;
   late final Animation<double> _pulseScale;
   bool _done = false;
+  Timer? _safetyTimer;
 
   @override
   void initState() {
@@ -74,10 +79,17 @@ class _TimeRefillDialogState extends State<_TimeRefillDialog>
     _pulseScale = Tween(begin: 0.97, end: 1.05).animate(
       CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
     );
+
+    final expected = TimeAnimation.durationForDelta(
+      widget.toSeconds - widget.fromSeconds,
+    );
+    // Never leave the pour stuck — dismiss even if the tween fails to complete.
+    _safetyTimer = Timer(expected + const Duration(milliseconds: 1600), _onComplete);
   }
 
   @override
   void dispose() {
+    _safetyTimer?.cancel();
     _pulse.dispose();
     super.dispose();
   }
@@ -85,7 +97,8 @@ class _TimeRefillDialogState extends State<_TimeRefillDialog>
   void _onComplete() {
     if (_done) return;
     _done = true;
-    Future<void>.delayed(const Duration(milliseconds: 500), () {
+    _safetyTimer?.cancel();
+    Future<void>.delayed(const Duration(milliseconds: 420), () {
       if (mounted) Navigator.of(context).pop();
     });
   }
@@ -99,76 +112,90 @@ class _TimeRefillDialogState extends State<_TimeRefillDialog>
 
     return Material(
       color: Colors.transparent,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ScaleTransition(
-                scale: _pulseScale,
-                child: Icon(
-                  increasing ? Icons.bolt : Icons.hourglass_bottom,
-                  color: accent,
-                  size: 48,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.title ?? label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: accent,
-                      letterSpacing: 2,
-                      fontSize: 12,
-                    ),
-              ),
-              if (widget.subtitle != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  widget.subtitle!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 12,
-                        color: AppColors.goldBright.withValues(alpha: 0.85),
-                        letterSpacing: 0.3,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: accent.withValues(alpha: 0.5)),
-                ),
-                child: Text(
-                  TimeAnimation.formatDelta(delta),
-                  style: TextStyle(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _onComplete,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ScaleTransition(
+                  scale: _pulseScale,
+                  child: Icon(
+                    increasing ? Icons.bolt : Icons.local_bar,
                     color: accent,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                    letterSpacing: 1,
+                    size: 48,
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              AnimatedTimeDisplay(
-                initialSeconds: widget.fromSeconds,
-                seconds: widget.toSeconds,
-                color: accent,
-                fontSize: 52,
-                onAnimationComplete: _onComplete,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                increasing ? 'Balance increasing…' : 'Balance decreasing…',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 10,
-                      color: AppColors.textMuted,
+                const SizedBox(height: 16),
+                Text(
+                  widget.title ?? label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: accent,
+                        letterSpacing: 2,
+                        fontSize: 12,
+                      ),
+                ),
+                if (widget.subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.subtitle!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: 12,
+                          color: AppColors.goldBright.withValues(alpha: 0.85),
+                          letterSpacing: 0.3,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: accent.withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    TimeAnimation.formatDelta(delta),
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      letterSpacing: 1,
                     ),
-              ),
-            ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                AnimatedTimeDisplay(
+                  initialSeconds: widget.fromSeconds,
+                  seconds: widget.toSeconds,
+                  color: accent,
+                  fontSize: 52,
+                  animateDecreases: true,
+                  onAnimationComplete: _onComplete,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  increasing ? 'Balance increasing…' : 'Balance decreasing…',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: 10,
+                        color: AppColors.textMuted,
+                      ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'TAP TO CONTINUE',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontSize: 9,
+                        letterSpacing: 2,
+                        color: AppColors.textMuted,
+                      ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
