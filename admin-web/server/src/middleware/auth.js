@@ -7,32 +7,44 @@ export async function requireAdmin(req, res, next) {
   }
 
   const token = header.slice(7);
-  const client = supabaseAsUser(token);
-  const { data: authData, error: authError } = await client.auth.getUser(token);
 
-  if (authError || !authData.user) {
-    return res.status(401).json({ error: 'Invalid or expired session.' });
+  // Prefer service-role auth lookup — more reliable on Vercel serverless.
+  let user = null;
+  const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
+  if (!authError && authData.user) {
+    user = authData.user;
+  } else {
+    const client = supabaseAsUser(token);
+    const fallback = await client.auth.getUser(token);
+    if (fallback.error || !fallback.data.user) {
+      return res.status(401).json({
+        error: authError?.message || fallback.error?.message || 'Invalid or expired session.',
+      });
+    }
+    user = fallback.data.user;
   }
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('id, name, email, role, is_banned')
-    .eq('id', authData.user.id)
+    .eq('id', user.id)
     .single();
 
   if (profileError || !profile) {
-    return res.status(403).json({ error: 'Profile not found.' });
+    return res.status(403).json({ error: profileError?.message || 'Profile not found.' });
   }
 
   if (!['admin', 'hr'].includes(profile.role)) {
-    return res.status(403).json({ error: 'Admin or HR access required.' });
+    return res.status(403).json({
+      error: `Admin or HR access required (current role: ${profile.role}).`,
+    });
   }
 
   if (profile.is_banned) {
     return res.status(403).json({ error: 'Your account is suspended.' });
   }
 
-  req.user = authData.user;
+  req.user = user;
   req.profile = profile;
   req.token = token;
   next();

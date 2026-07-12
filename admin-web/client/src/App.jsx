@@ -10,10 +10,22 @@ import GuestsPage from './pages/GuestsPage';
 import HrPage from './pages/HrPage';
 
 function Protected({ children }) {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, accessError, signOut } = useAuth();
   if (loading) return <div className="login-page">Loading…</div>;
   if (!session) return <Navigate to="/login" replace />;
-  if (!profile) return <div className="login-page"><p className="error">Access denied — admin or HR role required.</p></div>;
+  if (!profile) {
+    return (
+      <div className="login-page">
+        <div className="login-card card">
+          <p className="error">{accessError || 'Access denied — admin or HR role required.'}</p>
+          <p className="page-sub">Sign out and try again after your role is set to admin.</p>
+          <button type="button" className="btn" onClick={() => signOut()}>
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
   return children;
 }
 
