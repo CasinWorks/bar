@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700;800;900&family=Share+Tech+Mono&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", "JetBrains Mono", monospace;
+  --font-serif: "Cinzel", "Playfair Display", Georgia, serif;
+  
+  --color-crimson-deep: #2A0000;
+  --color-crimson-rich: #4D0000;
+  --color-crimson: #8B0000;
+  --color-crimson-bright: #B22222;
+  --color-gold-brushed: #C5A059;
+  --color-gold-bright: #E5C180;
+  --color-gold-dark: #8E6E35;
+}
+
+
+/* Authentic Art Deco geometric diamond lattice screen pattern */
+.chinese-lattice {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z M20 10 L30 20 L20 30 L10 20 Z' stroke='%23C5A059' stroke-width='0.8' stroke-opacity='0.08' fill='none'/%3E%3C/svg%3E");
+}
+
+/* Authentic Art Deco Arch pattern for a premium overlay */
+.chinese-cloud {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'%3E%3Cpath d='M0 20 Q10 0 20 20 T40 20 M0 15 Q10-5 20 15 T40 15' stroke='%23C5A059' stroke-width='0.6' stroke-opacity='0.05' fill='none'/%3E%3C/svg%3E");
+}
+
+/* Luxury card with dual gradients and red/gold lattice borders */
+.luxury-card {
+  background: linear-gradient(135deg, #1C0A00 0%, #050000 100%);
+  border: 1px solid rgba(197, 160, 89, 0.2);
+  position: relative;
+}
+
+.luxury-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z' stroke='%23C5A059' stroke-width='0.5' stroke-opacity='0.04' fill='none'/%3E%3C/svg%3E");
+  opacity: 0.8;
+  border-radius: inherit;
+}
+
+/* Golden text stroke and speakeasy fonts */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #E5C180 0%, #C5A059 50%, #8E6E35 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #E5C180 0%, #C5A059 50%, #8E6E35 100%);
+}
+
+.bg-crimson-gradient {
+  background: linear-gradient(135deg, #8B0000 0%, #4D0000 100%);
+}
+
+.bg-crimson-radial {
+  background: radial-gradient(circle at center, #8B0000 0%, #2A0000 70%, #0D0000 100%);
+}
+
+.shadow-gold {
+  box-shadow: 0 4px 20px rgba(197, 160, 89, 0.15);
+}
+
+.shadow-crimson-glow {
+  box-shadow: 0 0 25px rgba(139, 0, 0, 0.35);
+}
+

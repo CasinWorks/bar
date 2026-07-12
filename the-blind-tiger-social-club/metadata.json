@@ -1,0 +1,6 @@
+{
+  "name": "The Blind Tiger Social Club",
+  "description": "The official high-end mobile companion app for The Blind Tiger Social Club & Speakeasy Entertainment Lounge. Features real-time check-ins, time-currency drink orders, secret entry codes, interactive turntable challenges, and automatic midnight club transitions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

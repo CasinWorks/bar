@@ -1,0 +1,328 @@
+import 'package:flutter/material.dart';
+import '../core/theme/app_colors.dart';
+
+class AvatarConfig {
+  const AvatarConfig({
+    this.hair = 'TF',
+    this.eyes = 'SV',
+    this.accessory = 'GP',
+    this.color = 0xFFD97706,
+    this.name = 'TigerGuest_07',
+  });
+
+  final String hair;
+  final String eyes;
+  final String accessory;
+  final int color;
+  final String name;
+
+  AvatarConfig copyWith({
+    String? hair,
+    String? eyes,
+    String? accessory,
+    int? color,
+    String? name,
+  }) {
+    return AvatarConfig(
+      hair: hair ?? this.hair,
+      eyes: eyes ?? this.eyes,
+      accessory: accessory ?? this.accessory,
+      color: color ?? this.color,
+      name: name ?? this.name,
+    );
+  }
+}
+
+class AvatarOption {
+  const AvatarOption({required this.id, required this.name, required this.path});
+  final String id;
+  final String name;
+  final String path;
+}
+
+class PresetColor {
+  const PresetColor({required this.code, required this.name});
+  final int code;
+  final String name;
+}
+
+class PriceTier {
+  const PriceTier({
+    required this.id,
+    required this.duration,
+    required this.price,
+    required this.tagline,
+    required this.valueProp,
+    this.popular = false,
+  });
+
+  final String id;
+  final int duration;
+  final int price;
+  final String tagline;
+  final String valueProp;
+  final bool popular;
+
+  int get discountedPrice => (price * 0.85).floor();
+}
+
+class TimePackage {
+  const TimePackage({
+    required this.id,
+    required this.minutes,
+    required this.label,
+    required this.tagline,
+    this.popular = false,
+  });
+
+  final String id;
+  final int minutes;
+  final String label;
+  final String tagline;
+  final bool popular;
+
+  int get price => minutes * AppTimePricing.pesoPerMinute;
+  int get discountedPrice => (price * 0.85).floor();
+}
+
+/// Club time is sold per minute with a GCash referral discount on checkout.
+abstract final class AppTimePricing {
+  static const pesoPerMinute = 17;
+
+  static int priceForMinutes(int minutes) => minutes * pesoPerMinute;
+  static int discountedPriceForMinutes(int minutes) =>
+      (priceForMinutes(minutes) * 0.85).floor();
+}
+
+enum ChallengeCategory { drink, social, game }
+
+class Challenge {
+  Challenge({
+    required this.id,
+    required this.title,
+    required this.icon,
+    required this.targetCount,
+    this.currentCount = 0,
+    required this.points,
+    this.claimed = false,
+    required this.category,
+  });
+
+  final String id;
+  final String title;
+  final String icon;
+  final int targetCount;
+  int currentCount;
+  final int points;
+  bool claimed;
+  final ChallengeCategory category;
+
+  bool get isComplete => currentCount >= targetCount;
+
+  Challenge copyWith({
+    int? currentCount,
+    bool? claimed,
+  }) {
+    return Challenge(
+      id: id,
+      title: title,
+      icon: icon,
+      targetCount: targetCount,
+      currentCount: currentCount ?? this.currentCount,
+      points: points,
+      claimed: claimed ?? this.claimed,
+      category: category,
+    );
+  }
+}
+
+class FeedEvent {
+  FeedEvent({
+    required this.id,
+    required this.avatarSeed,
+    required this.userName,
+    required this.userRank,
+    required this.isFriend,
+    required this.timeAgo,
+    required this.eventText,
+    Map<String, int>? likes,
+    this.userReacted,
+  }) : likes = likes ?? {'luxe': 0, 'salute': 0, 'gold': 0};
+
+  final String id;
+  final AvatarSeed avatarSeed;
+  final String userName;
+  final String userRank;
+  final bool isFriend;
+  final String timeAgo;
+  final String eventText;
+  final Map<String, int> likes;
+  String? userReacted;
+}
+
+class AvatarSeed {
+  const AvatarSeed({
+    required this.hair,
+    required this.eyes,
+    required this.accessory,
+    required this.color,
+  });
+
+  final String hair;
+  final String eyes;
+  final String accessory;
+  final int color;
+}
+
+enum MemberTier { vvip, platinum, gold, silver, bronze }
+
+/// Time thresholds for member tiers and private room access.
+abstract final class MemberTierThresholds {
+  static const silverSeconds = 45 * 60;
+  static const goldSeconds = 90 * 60;
+  static const platinumSeconds = 3 * 3600;
+  static const vipRoomSeconds = platinumSeconds;
+  static const vvipSeconds = 100 * 3600;
+  static const vvipRoomSeconds = vvipSeconds;
+
+  static MemberTier tierForSeconds(int seconds) {
+    if (seconds >= vvipSeconds) return MemberTier.vvip;
+    if (seconds >= platinumSeconds) return MemberTier.platinum;
+    if (seconds >= goldSeconds) return MemberTier.gold;
+    if (seconds >= silverSeconds) return MemberTier.silver;
+    return MemberTier.bronze;
+  }
+}
+
+extension MemberTierLabel on MemberTier {
+  String get label => switch (this) {
+        MemberTier.vvip => 'VVIP',
+        MemberTier.platinum => 'Platinum',
+        MemberTier.gold => 'Gold',
+        MemberTier.silver => 'Silver',
+        MemberTier.bronze => 'Bronze',
+      };
+
+  Color get accentColor => switch (this) {
+        MemberTier.vvip => AppColors.vvipAmethyst,
+        MemberTier.platinum => AppColors.goldBright,
+        MemberTier.gold => AppColors.tigerOrange,
+        MemberTier.silver => AppColors.neutral400,
+        MemberTier.bronze => AppColors.goldDark,
+      };
+}
+
+class LeaderboardUser {
+  LeaderboardUser({
+    required this.rank,
+    required this.name,
+    required this.points,
+    required this.tier,
+    this.isCurrentUser = false,
+    required this.avatarColor,
+    required this.avatarGlyph,
+    this.timeBalance,
+  });
+
+  final int rank;
+  final String name;
+  int points;
+  MemberTier tier;
+  final bool isCurrentUser;
+  final int avatarColor;
+  final String avatarGlyph;
+  int? timeBalance;
+}
+
+enum DrinkCategory { spirits, wine, beer, nonAlc }
+
+extension DrinkCategoryLabel on DrinkCategory {
+  String get label => switch (this) {
+        DrinkCategory.spirits => 'Spirits',
+        DrinkCategory.wine => 'Wine',
+        DrinkCategory.beer => 'Beer',
+        DrinkCategory.nonAlc => 'Non-Alc',
+      };
+}
+
+class Drink {
+  const Drink({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.description,
+    required this.price,
+    required this.flavor,
+    required this.abv,
+    this.badge,
+    required this.ingredients,
+    required this.bartenderQuote,
+    required this.imageColorStart,
+    required this.imageColorEnd,
+    required this.timeCostSeconds,
+  });
+
+  final String id;
+  final String name;
+  final DrinkCategory category;
+  final String description;
+  final String price;
+  final String flavor;
+  final String abv;
+  final String? badge;
+  final List<String> ingredients;
+  final String bartenderQuote;
+  final int imageColorStart;
+  final int imageColorEnd;
+  final int timeCostSeconds;
+}
+
+class MiniGame {
+  const MiniGame({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.points,
+    required this.icon,
+    this.locked = false,
+    this.lockRequirement,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final int points;
+  final String icon;
+  final bool locked;
+  final String? lockRequirement;
+}
+
+class ClubBranch {
+  const ClubBranch({
+    required this.id,
+    required this.name,
+    required this.city,
+    required this.icon,
+    required this.ambience,
+  });
+
+  final String id;
+  final String name;
+  final String city;
+  final String icon;
+  final String ambience;
+}
+
+enum PaymentMethod { gcash, visa, paymaya }
+
+extension PaymentMethodLabel on PaymentMethod {
+  String get label => switch (this) {
+        PaymentMethod.gcash => 'GCASH',
+        PaymentMethod.visa => 'VISA',
+        PaymentMethod.paymaya => 'MAYA',
+      };
+}
+
+enum LoungeTab { challenges, games, social, menu, leaderboard }
+
+enum DoorStatus { locked, unlocked, wrong }
