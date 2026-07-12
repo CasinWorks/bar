@@ -89,6 +89,7 @@ class MemberUser {
   MemberUser copyWith({
     String? name,
     String? branch,
+    UserRole? role,
     int? timeBalanceSeconds,
     bool? isBanned,
     bool? isWhitelisted,
@@ -98,7 +99,7 @@ class MemberUser {
         name: name ?? this.name,
         email: email,
         birthdate: birthdate,
-        role: role,
+        role: role ?? this.role,
         branch: branch ?? this.branch,
         timeBalanceSeconds: timeBalanceSeconds ?? this.timeBalanceSeconds,
         isBanned: isBanned ?? this.isBanned,

@@ -1,4 +1,5 @@
 import { supabaseAsUser, supabaseAdmin } from '../lib/supabase.js';
+import { isSuperAdminEmail } from '../lib/superAdmin.js';
 
 export async function requireAdmin(req, res, next) {
   const header = req.headers.authorization;
@@ -24,7 +25,7 @@ export async function requireAdmin(req, res, next) {
     user = fallback.data.user;
   }
 
-  const { data: profile, error: profileError } = await supabaseAdmin
+  let { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('id, name, email, role, is_banned')
     .eq('id', user.id)
@@ -32,6 +33,17 @@ export async function requireAdmin(req, res, next) {
 
   if (profileError || !profile) {
     return res.status(403).json({ error: profileError?.message || 'Profile not found.' });
+  }
+
+  // Founder account must never get stuck as member.
+  if (isSuperAdminEmail(profile.email) && profile.role !== 'admin') {
+    const { data: healed, error: healError } = await supabaseAdmin
+      .from('profiles')
+      .update({ role: 'admin' })
+      .eq('id', profile.id)
+      .select('id, name, email, role, is_banned')
+      .single();
+    if (!healError && healed) profile = healed;
   }
 
   if (!['admin', 'hr'].includes(profile.role)) {

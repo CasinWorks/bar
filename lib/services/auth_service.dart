@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
+import '../core/config/super_admin.dart';
 import '../core/config/supabase_config.dart';
 import '../models/member_user.dart';
 
@@ -303,17 +304,25 @@ class AuthService {
   Future<MemberUser> _ensureProfile(User authUser) async {
     try {
       return await _fetchProfile(authUser.id);
+    } on AuthException {
+      // Banned / role policy — never treat as "missing profile".
+      rethrow;
     } catch (_) {
       final metadata = authUser.userMetadata ?? {};
       try {
         // Never include `role` here — upsert would overwrite admin/hr/staff
         // back to member and lock you out of the admin console.
-        await _client!.from('profiles').upsert({
+        final row = <String, dynamic>{
           'id': authUser.id,
           'name': metadata['name'] ?? '',
           'email': authUser.email ?? '',
           'birthdate': metadata['birthdate'],
-        });
+        };
+        // New founder rows must land as admin.
+        if (isSuperAdminEmail(authUser.email)) {
+          row['role'] = UserRole.admin.name;
+        }
+        await _client!.from('profiles').upsert(row);
       } catch (e) {
         throw AuthException(_mapSupabaseError(e));
       }
@@ -329,7 +338,17 @@ class AuthService {
           .eq('id', userId)
           .single();
 
-      final user = MemberUser.fromSupabaseProfile(row);
+      var user = MemberUser.fromSupabaseProfile(row);
+
+      // Self-heal founder demotions before mobile/admin access checks.
+      if (isSuperAdminEmail(user.email) && user.role != UserRole.admin) {
+        await _client!
+            .from('profiles')
+            .update({'role': UserRole.admin.name})
+            .eq('id', userId);
+        user = user.copyWith(role: UserRole.admin);
+      }
+
       _validateMobileAccess(user);
       return user;
     } catch (e) {
@@ -344,6 +363,8 @@ class AuthService {
         'Your account has been suspended. Contact the club for assistance.',
       );
     }
+    // Founder operates both surfaces for demos.
+    if (isSuperAdminEmail(user.email)) return;
     if (user.isAdmin) {
       throw AuthException(
         'Admin and HR accounts use the Blind Tiger web console, not the mobile app.',
