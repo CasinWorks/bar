@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { resolveLoad, CASH_PACKAGES } from '../lib/timePricing.js';
+import { isSuperAdminEmail } from '../lib/superAdmin.js';
 
 const router = Router();
 
@@ -9,6 +10,14 @@ const LOADS_EMBED_SELECT =
   '*, recipient:profiles!member_id(name, email, role), ' +
   'loader:profiles!loaded_by(name, email, role), ' +
   'voider:profiles!voided_by(name)';
+
+function hideSuperAdminLoads(loads) {
+  return (loads ?? []).filter(
+    (row) =>
+      !isSuperAdminEmail(row.recipient?.email) &&
+      !isSuperAdminEmail(row.member?.email),
+  );
+}
 
 async function fetchTimeLoads() {
   const { data, error } = await supabaseAdmin
@@ -65,7 +74,7 @@ router.get('/packages', requireAdmin, (_req, res) => {
 router.get('/', requireAdmin, async (req, res) => {
   const { data, error } = await fetchTimeLoads();
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ loads: data });
+  res.json({ loads: hideSuperAdminLoads(data) });
 });
 
 router.post('/', requireAdmin, async (req, res) => {

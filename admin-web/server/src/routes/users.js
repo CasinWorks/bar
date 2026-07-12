@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireAdmin, requireAdminOnly } from '../middleware/auth.js';
+import { isSuperAdminEmail, withoutSuperAdmins } from '../lib/superAdmin.js';
 
 const router = Router();
 
@@ -44,7 +45,8 @@ router.get('/', requireAdmin, async (req, res) => {
     .limit(200);
 
   if (loadable === 'true') {
-    query = query.in('role', ['member', 'staff', 'admin', 'hr']).eq('is_banned', false);
+    // Cash desk: members + staff only (never list hidden super admin)
+    query = query.in('role', ['member', 'staff']).eq('is_banned', false);
   } else if (role) {
     query = query.eq('role', role);
   }
@@ -58,7 +60,7 @@ router.get('/', requireAdmin, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
 
   try {
-    const users = await attachActiveSessionTime(data);
+    const users = withoutSuperAdmins(await attachActiveSessionTime(data));
     res.json({ users });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -67,6 +69,17 @@ router.get('/', requireAdmin, async (req, res) => {
 
 router.patch('/:id', requireAdmin, requireAdminOnly, async (req, res) => {
   const { id } = req.params;
+
+  const { data: existing } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, role')
+    .eq('id', id)
+    .single();
+
+  if (existing && isSuperAdminEmail(existing.email)) {
+    return res.status(403).json({ error: 'This account is protected and cannot be modified.' });
+  }
+
   const allowed = ['role', 'is_banned', 'is_whitelisted', 'ban_reason', 'admin_notes', 'branch', 'name'];
   const patch = {};
   for (const key of allowed) {
