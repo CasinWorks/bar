@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireAdmin } from '../middleware/auth.js';
-import { isSuperAdminEmail, withoutSuperAdmins } from '../lib/superAdmin.js';
+import { isSuperAdminEmail } from '../lib/superAdmin.js';
 
 const router = Router();
 
@@ -17,11 +17,7 @@ router.get('/', requireAdmin, async (req, res) => {
     .order('full_name', { ascending: true });
 
   if (error) return res.status(500).json({ error: error.message });
-  res.json({
-    employees: withoutSuperAdmins(data, 'email').filter(
-      (emp) => !isSuperAdminEmail(emp.profile?.email),
-    ),
-  });
+  res.json({ employees: data ?? [] });
 });
 
 /**

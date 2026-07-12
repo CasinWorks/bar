@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireAdmin, requireAdminOnly } from '../middleware/auth.js';
-import { isSuperAdminEmail, withoutSuperAdmins } from '../lib/superAdmin.js';
+import { isSuperAdminEmail } from '../lib/superAdmin.js';
 
 const router = Router();
 
@@ -45,8 +45,8 @@ router.get('/', requireAdmin, async (req, res) => {
     .limit(200);
 
   if (loadable === 'true') {
-    // Cash desk: members + staff only (never list hidden super admin)
-    query = query.in('role', ['member', 'staff']).eq('is_banned', false);
+    // Cash desk: anyone not banned (includes founder / admin for demos)
+    query = query.eq('is_banned', false);
   } else if (role) {
     query = query.eq('role', role);
   }
@@ -60,7 +60,7 @@ router.get('/', requireAdmin, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
 
   try {
-    const users = withoutSuperAdmins(await attachActiveSessionTime(data));
+    const users = await attachActiveSessionTime(data);
     res.json({ users });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -103,7 +103,7 @@ router.get('/:id/sessions', requireAdmin, async (req, res) => {
     .select('*')
     .eq('member_id', req.params.id)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(50);
 
   if (error) return res.status(500).json({ error: error.message });
   res.json({ sessions: data });

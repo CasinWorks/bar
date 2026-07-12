@@ -6,6 +6,7 @@ import timeLoadsRoutes from './routes/timeLoads.js';
 import eventsRoutes from './routes/events.js';
 import guestsRoutes from './routes/guests.js';
 import employeesRoutes from './routes/employees.js';
+import leaderboardRoutes from './routes/leaderboard.js';
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api/time-loads', timeLoadsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/guests', guestsRoutes);
 app.use('/api/employees', employeesRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

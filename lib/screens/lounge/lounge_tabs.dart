@@ -328,50 +328,71 @@ class LeaderboardTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        LuxuryCard(
-          padding: const EdgeInsets.all(12),
-          highlighted: true,
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Color(state.avatar.color),
-                child: Text(state.avatar.name.substring(0, 1), style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(state.user?.name ?? 'You', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text(
-                      '#${state.currentRank} • ${state.formatDuration(state.spendableTimeSeconds)} • ${state.memberTier.label}',
-                      style: const TextStyle(color: AppColors.goldBright, fontSize: 10),
-                    ),
-                  ],
+    return RefreshIndicator(
+      color: AppColors.goldBrushed,
+      backgroundColor: AppColors.cardSurface,
+      onRefresh: () => context.read<AppState>().refreshLeaderboard(),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          LuxuryCard(
+            padding: const EdgeInsets.all(12),
+            highlighted: true,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Color(state.avatar.color),
+                  child: Text(
+                    state.avatar.name.isNotEmpty
+                        ? state.avatar.name.substring(0, 1)
+                        : 'Y',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-              Text(
-                '#${state.currentRank}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  color: AppColors.goldBright,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(state.user?.name ?? 'You', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        '#${state.currentRank} • ${state.formatDuration(state.spendableTimeSeconds)} • ${state.memberTier.label}',
+                        style: const TextStyle(color: AppColors.goldBright, fontSize: 10),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Text(
+                  '#${state.currentRank}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    color: AppColors.goldBright,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'RANKED BY CLUB TIME',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
-        ),
-        const SizedBox(height: 8),
-        ...state.leaderboard.map((user) => _LeaderRow(user: user)),
-      ],
+          const SizedBox(height: 12),
+          Text(
+            'LIVE CLUB RANKINGS · BY WALLET TIME',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+          ),
+          const SizedBox(height: 8),
+          if (state.leaderboard.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'Pull to refresh rankings…',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            )
+          else
+            ...state.leaderboard.map((user) => _LeaderRow(user: user)),
+        ],
+      ),
     );
   }
 }

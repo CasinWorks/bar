@@ -8,6 +8,7 @@ import '../models/member_user.dart';
 import '../models/qr_payload.dart';
 import '../models/staff_tip_received.dart';
 import '../services/auth_service.dart';
+import '../services/leaderboard_service.dart';
 import '../services/payment_service.dart';
 import '../services/qr_service.dart';
 import '../services/session_store.dart';
@@ -21,17 +22,20 @@ class AppState extends ChangeNotifier {
     QrService? qrService,
     SessionStore? sessionStore,
     TimeGiftService? timeGiftService,
+    LeaderboardService? leaderboardService,
   })  : _auth = authService ?? AuthService(),
         _payment = paymentService ?? PaymentService(),
         _qr = qrService ?? QrService(),
         _sessionStore = sessionStore ?? SessionStore.instance,
-        _gifts = timeGiftService ?? TimeGiftService();
+        _gifts = timeGiftService ?? TimeGiftService(),
+        _leaderboardService = leaderboardService ?? LeaderboardService();
 
   final AuthService _auth;
   final PaymentService _payment;
   final QrService _qr;
   final SessionStore _sessionStore;
   final TimeGiftService _gifts;
+  final LeaderboardService _leaderboardService;
   final _uuid = const Uuid();
 
   bool _isLoading = true;
@@ -408,26 +412,59 @@ class AppState extends ChangeNotifier {
     _avatar = AvatarConfig(name: _user?.name ?? 'Socialite');
     _challenges = MockData.initialChallenges();
     _feedEvents = MockData.initialFeedEvents();
-    _leaderboard = MockData.initialLeaderboard()
-        .map((u) => u.isCurrentUser
-            ? LeaderboardUser(
-                rank: u.rank,
-                name: _user?.name ?? u.name,
-                points: _points,
-                tier: memberTier,
-                isCurrentUser: true,
-                avatarColor: u.avatarColor,
-                avatarGlyph: u.avatarGlyph,
-                timeBalance: spendableTimeSeconds,
-              )
-            : u)
-        .toList();
-    _recalculateLeaderboardRanks();
+    _leaderboard = [];
     _progressChallenge('chal-1', by: 1); // entered club
+    unawaited(refreshLeaderboard());
   }
 
   void setActiveTab(LoungeTab tab) {
     _activeTab = tab;
+    if (tab == LoungeTab.leaderboard) {
+      unawaited(refreshLeaderboard());
+    }
+    notifyListeners();
+  }
+
+  Future<void> refreshLeaderboard() async {
+    try {
+      final rankings = await _leaderboardService.fetchRankings();
+      if (rankings.isEmpty) {
+        _leaderboard = [
+          LeaderboardUser(
+            rank: 1,
+            name: _user?.name ?? 'You',
+            points: spendableTimeSeconds ~/ 60,
+            tier: memberTier,
+            isCurrentUser: true,
+            avatarColor: _avatar.color,
+            avatarGlyph: (_user?.name.isNotEmpty ?? false)
+                ? _user!.name.substring(0, 1).toUpperCase()
+                : 'Y',
+            timeBalance: spendableTimeSeconds,
+          ),
+        ];
+      } else {
+        _leaderboard = _leaderboardService.toLeaderboardUsers(rankings);
+        _recalculateLeaderboardRanks();
+      }
+    } catch (_) {
+      if (_leaderboard.isEmpty && _user != null) {
+        _leaderboard = [
+          LeaderboardUser(
+            rank: 1,
+            name: _user!.name,
+            points: spendableTimeSeconds ~/ 60,
+            tier: memberTier,
+            isCurrentUser: true,
+            avatarColor: _avatar.color,
+            avatarGlyph: _user!.name.isNotEmpty
+                ? _user!.name.substring(0, 1).toUpperCase()
+                : 'Y',
+            timeBalance: spendableTimeSeconds,
+          ),
+        ];
+      }
+    }
     notifyListeners();
   }
 
