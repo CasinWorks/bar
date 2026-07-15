@@ -15,6 +15,7 @@
   font-family: var(--lp-sans);
   overflow-x: hidden;
   min-height: 100vh;
+  scroll-behavior: auto;
 }
 
 .lp * {
@@ -27,6 +28,8 @@
   z-index: 0;
   border-radius: 50%;
   filter: blur(80px);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
 }
 
 .lp-glow-a {
@@ -215,6 +218,7 @@
   position: relative;
   min-height: 520px;
   transform-style: preserve-3d;
+  contain: layout paint;
 }
 
 .lp-orb {
@@ -224,6 +228,7 @@
   background: radial-gradient(circle at 40% 35%, rgba(229, 193, 128, 0.55), rgba(139, 0, 0, 0.15) 45%, transparent 70%);
   filter: blur(2px);
   opacity: 0.75;
+  will-change: opacity, transform;
 }
 
 .lp-emblem {
@@ -244,6 +249,7 @@
   display: grid;
   place-items: center;
   transform-style: preserve-3d;
+  will-change: transform, opacity;
 }
 
 .lp-tiger {
@@ -289,6 +295,7 @@
   letter-spacing: 0.04em;
   color: var(--lp-gold-bright);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  will-change: transform, opacity;
 }
 
 .lp-float-card small {
@@ -311,6 +318,111 @@
   box-shadow: 0 0 10px #2ecc71;
 }
 
+.lp-beat-stage {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  z-index: 4;
+  width: min(420px, 78vw);
+  padding: 18px 18px 16px;
+  border: 1px solid rgba(229, 193, 128, 0.24);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(229, 193, 128, 0.15), transparent 58%),
+    linear-gradient(180deg, rgba(10, 4, 0, 0.86), rgba(7, 2, 0, 0.72));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%) translateZ(30px);
+  overflow: hidden;
+  will-change: transform, opacity;
+}
+
+.lp-beat-title {
+  margin-bottom: 12px;
+  color: var(--lp-gold);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-align: center;
+}
+
+.lp-beat-bars {
+  height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.lp-beat-bars i {
+  display: block;
+  width: 7px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--lp-gold-bright), var(--lp-gold), rgba(92, 16, 16, 0.9));
+  box-shadow: 0 0 18px rgba(229, 193, 128, 0.28);
+  animation: lp-beat 940ms ease-in-out infinite;
+  animation-delay: calc(var(--i) * -72ms);
+  transform-origin: center;
+}
+
+.lp-wave-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.lp-wave-lines span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(229, 193, 128, 0.24);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: lp-wave 2.4s ease-out infinite;
+}
+
+.lp-wave-lines span:nth-child(2) {
+  animation-delay: 0.6s;
+}
+
+.lp-wave-lines span:nth-child(3) {
+  animation-delay: 1.2s;
+}
+
+@keyframes lp-beat {
+  0%, 100% {
+    height: 22px;
+    opacity: 0.55;
+  }
+  22% {
+    height: 74px;
+    opacity: 1;
+  }
+  44% {
+    height: 34px;
+    opacity: 0.78;
+  }
+  66% {
+    height: 58px;
+    opacity: 0.92;
+  }
+}
+
+@keyframes lp-wave {
+  0% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(4.2);
+  }
+}
+
 .lp-dash-preview {
   position: absolute;
   left: 4%;
@@ -326,6 +438,7 @@
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
   transform-style: preserve-3d;
   min-height: 210px;
+  will-change: transform, opacity;
 }
 
 .lp-dash-side {
@@ -398,7 +511,44 @@
   letter-spacing: 0.28em;
   color: var(--lp-muted);
   margin: 0 0 24px;
-  opacity: 0.7;
+  opacity: 0.75;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.lp-scroll-hint-line {
+  width: 1px;
+  height: 28px;
+  background: linear-gradient(180deg, transparent, var(--lp-gold-bright), transparent);
+  animation: lp-scroll-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes lp-scroll-pulse {
+  0%, 100% { opacity: 0.25; transform: scaleY(0.7); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+
+/* Lenis smooth scroll — landing */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+html.lenis {
+  scroll-behavior: auto !important;
+}
+
+html.lp-scroll-lock,
+html.lp-scroll-lock body {
+  overscroll-behavior-y: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-scroll-hint-line {
+    animation: none;
+  }
 }
 
 /* Story pin — AirPods copy cadence */
@@ -566,6 +716,23 @@
   text-decoration: none;
 }
 
+.lp-mvp-trigger {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: default;
+}
+
+.lp-mvp-trigger:focus-visible {
+  outline: 1px solid rgba(229, 193, 128, 0.55);
+  outline-offset: 3px;
+}
+
 @media (max-width: 960px) {
   .lp-hero {
     grid-template-columns: 1fr;
@@ -588,6 +755,20 @@
   .lp-float-card {
     right: 0;
     top: 0;
+  }
+
+  .lp-beat-stage {
+    top: 44%;
+    width: min(360px, 86vw);
+  }
+
+  .lp-beat-bars {
+    height: 72px;
+    gap: 5px;
+  }
+
+  .lp-beat-bars i {
+    width: 6px;
   }
 }
 

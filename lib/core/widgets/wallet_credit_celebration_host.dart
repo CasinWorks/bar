@@ -25,6 +25,11 @@ class _WalletCreditCelebrationHostState
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, app, _) {
+        // Never cover the exit checkout receipt with a wallet pour overlay.
+        if (app.hasCheckoutReceipt) {
+          return widget.child;
+        }
+
         final pending = app.pendingWalletCredit;
         final isNew = pending != null &&
             (pending.fromSeconds != _lastShown?.fromSeconds ||

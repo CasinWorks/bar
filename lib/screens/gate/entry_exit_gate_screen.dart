@@ -165,22 +165,20 @@ class ExitGateScreen extends StatelessWidget {
     final session = state.session;
     final qr = state.currentQr;
 
-    if (session == null) {
+    // Never bounce a completed exit to pricing — that was the "vanishing" flash.
+    if (state.hasCheckoutReceipt ||
+        state.sessionPhase == SessionPhase.completed ||
+        session == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
-        if (state.hasCheckoutReceipt) {
+        if (state.hasCheckoutReceipt ||
+            state.sessionPhase == SessionPhase.completed) {
           context.go('/summary');
         } else {
           context.go('/pricing');
         }
       });
       return const SizedBox.shrink();
-    }
-
-    if (state.sessionPhase == SessionPhase.completed || state.hasCheckoutReceipt) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/summary');
-      });
     }
 
     return Scaffold(
@@ -212,7 +210,10 @@ class ExitGateScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         'Time remaining: ${state.formatDuration(state.timeRemaining)}',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.goldBright),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppColors.timerNeon,
+                              shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.7),
+                            ),
                       ),
                     ],
                   ),
@@ -224,7 +225,7 @@ class ExitGateScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Timer paused. Scan required to complete checkout.',
+                        'Time still counts until door staff scans. Holding this QR does not pause the meter.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
                       ),
                     ),

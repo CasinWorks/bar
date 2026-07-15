@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
+import '../../core/widgets/tiger_motion.dart';
 import '../../data/mock_data.dart';
 import '../../models/blind_tiger_models.dart';
+import '../../models/social_play.dart';
 import '../../providers/app_state.dart';
 import 'drink_detail_sheet.dart';
 import 'mini_game_modal.dart';
 import 'pass_the_glass_sheet.dart';
+import 'toast_to_meet_sheet.dart';
 
 class ChallengesTab extends StatelessWidget {
   const ChallengesTab({super.key});
@@ -88,18 +91,177 @@ class _ChallengeCard extends StatelessWidget {
       };
 }
 
-class GamesTab extends StatelessWidget {
+class GamesTab extends StatefulWidget {
   const GamesTab({super.key});
+
+  @override
+  State<GamesTab> createState() => _GamesTabState();
+}
+
+class _GamesTabState extends State<GamesTab> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AppState>().refreshWhosInside();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final others = state.whosInside.where((p) => !p.isSelf).toList();
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('LOUNGE ENTERTAINMENT', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9)),
+        FadeSlideIn(
+          child: Text(
+            'WITH SOMEONE',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+          ),
+        ),
         const SizedBox(height: 8),
-        GridView.builder(
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 60),
+          child: LuxuryCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Open to Meet',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          state.canSpendTime
+                              ? 'Appear on Who’s Inside at this branch'
+                              : 'Enter the club with time to opt in',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: state.openToMeet,
+                    activeThumbColor: AppColors.timerNeon,
+                    onChanged: state.canSpendTime
+                        ? (v) => state.setOpenToMeet(v)
+                        : null,
+                  ),
+                ],
+              ),
+              if (state.openToMeet || state.canSpendTime) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'YOUR VIBE',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 8),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: SocialVibeTags.options.map((tag) {
+                    final selected = state.vibeTag == tag;
+                    return GestureDetector(
+                      onTap: () => state.setVibeTag(tag),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: selected ? AppColors.goldBright : AppColors.neutral500,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: selected
+                              ? AppColors.goldBright.withValues(alpha: 0.12)
+                              : Colors.transparent,
+                        ),
+                        child: Text(
+                          tag,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: selected ? AppColors.goldBright : AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        ),
+        const SizedBox(height: 12),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 100),
+          child: Text(
+            'WHO’S INSIDE',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (others.isEmpty)
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 140),
+            child: LuxuryCard(
+              padding: const EdgeInsets.all(14),
+              child: Text(
+                state.openToMeet
+                    ? 'You’re visible — waiting for other socialites…'
+                    : 'Turn on Open to Meet to see who’s down for a toast.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              ),
+            ),
+          )
+        else
+          ...others.asMap().entries.map(
+                (e) => FadeSlideIn(
+                  delay: Duration(milliseconds: 120 + e.key * 50),
+                  child: _PresenceTile(presence: e.value),
+                ),
+              ),
+        const SizedBox(height: 12),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 180),
+          child: TigerButton(
+            label: 'TOAST TO MEET',
+            icon: Icons.qr_code_2,
+            onPressed: state.canSpendTime
+                ? () => ToastToMeetSheet.show(context)
+                : null,
+          ),
+        ),
+        const SizedBox(height: 8),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 220),
+          child: TigerButton(
+            label: 'DUO BEAT SYNC',
+            icon: Icons.music_note,
+            onPressed: state.canSpendTime
+                ? () => DuoBeatSheet.show(context)
+                : null,
+          ),
+        ),
+        const SizedBox(height: 24),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 260),
+          child: Text(
+            'SOLO',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 300),
+          child: GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -129,12 +291,26 @@ class GamesTab extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(_gameIcon(game.icon), color: locked ? AppColors.neutral500 : AppColors.goldBright),
+                        Icon(
+                          _gameIcon(game.icon),
+                          color: locked ? AppColors.neutral500 : AppColors.goldBright,
+                        ),
                         const Spacer(),
-                        Text(game.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                        Text('+${game.points} PTS', style: const TextStyle(fontSize: 9, color: AppColors.goldBrushed)),
+                        Text(
+                          game.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                        Text(
+                          '+${game.points} PTS',
+                          style: const TextStyle(fontSize: 9, color: AppColors.goldBrushed),
+                        ),
                         if (locked)
-                          Text(game.lockRequirement ?? '', style: const TextStyle(fontSize: 8, color: AppColors.tigerOrange)),
+                          Text(
+                            game.lockRequirement ?? '',
+                            style: const TextStyle(fontSize: 8, color: AppColors.tigerOrange),
+                          ),
                       ],
                     ),
                   ),
@@ -142,6 +318,7 @@ class GamesTab extends StatelessWidget {
               ),
             );
           },
+        ),
         ),
       ],
     );
@@ -156,6 +333,52 @@ class GamesTab extends StatelessWidget {
         'mystery' => Icons.workspace_premium,
         _ => Icons.videogame_asset,
       };
+}
+
+class _PresenceTile extends StatelessWidget {
+  const _PresenceTile({required this.presence});
+  final SocialPresence presence;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: LuxuryCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.goldBrushed.withValues(alpha: 0.25),
+              child: Text(
+                presence.displayName.isNotEmpty
+                    ? presence.displayName[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(color: AppColors.goldBright, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    presence.displayName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  Text(
+                    presence.vibeTag,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.waving_hand, size: 16, color: AppColors.timerNeon),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class SocialTab extends StatelessWidget {
@@ -358,7 +581,7 @@ class LeaderboardTab extends StatelessWidget {
                       Text(state.user?.name ?? 'You', style: const TextStyle(fontWeight: FontWeight.bold)),
                       Text(
                         '#${state.currentRank} • ${state.formatDuration(state.spendableTimeSeconds)} • ${state.memberTier.label}',
-                        style: const TextStyle(color: AppColors.goldBright, fontSize: 10),
+                        style: const TextStyle(color: AppColors.timerNeon, fontSize: 10),
                       ),
                     ],
                   ),
@@ -434,8 +657,11 @@ class _LeaderRow extends StatelessWidget {
               timeLabel,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: user.isCurrentUser ? AppColors.successGreen : AppColors.goldBrushed,
+                color: user.isCurrentUser ? AppColors.timerNeon : AppColors.timerNeonGlow,
                 fontSize: 11,
+                shadows: user.isCurrentUser
+                    ? AppColors.timerGlow(AppColors.timerNeon, intensity: 0.5)
+                    : null,
               ),
             ),
           ],

@@ -122,7 +122,7 @@ class _AnimatedTimeDisplayState extends State<AnimatedTimeDisplay>
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.color ?? AppColors.successGreen;
+    final color = widget.color ?? AppColors.timerNeon;
 
     return AnimatedBuilder(
       animation: _tween,
@@ -138,6 +138,7 @@ class _AnimatedTimeDisplayState extends State<AnimatedTimeDisplay>
             fontWeight: widget.fontWeight,
             color: color,
             letterSpacing: widget.letterSpacing,
+            shadows: AppColors.timerGlow(color),
           ),
         );
       },

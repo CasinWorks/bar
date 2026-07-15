@@ -3,13 +3,29 @@ import { useAuth } from '../context/AuthContext';
 import { api, formatDate } from '../lib/api';
 import EventDateTimePicker from '../components/EventDateTimePicker';
 
+function toLocalInputValue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const emptyForm = {
+  title: '',
+  startsAt: '',
+  branch: 'The Blind Tiger — BGC',
+  vipOnly: false,
+  status: 'scheduled',
+};
+
 export default function EventsPage() {
   const { token } = useAuth();
   const [events, setEvents] = useState([]);
-  const [title, setTitle] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [branch, setBranch] = useState('The Blind Tiger — BGC');
-  const [vipOnly, setVipOnly] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
   async function load() {
@@ -18,23 +34,90 @@ export default function EventsPage() {
   }
 
   useEffect(() => {
-    load().catch((e) => setErr(e.message));
+    let cancelled = false;
+    setLoading(true);
+    setErr('');
+    load()
+      .catch((e) => {
+        if (!cancelled) setErr(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
-  async function createEvent(e) {
+  function resetForm() {
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
+  function startEdit(ev) {
+    setEditingId(ev.id);
+    setForm({
+      title: ev.title || '',
+      startsAt: toLocalInputValue(ev.starts_at),
+      branch: ev.branch || 'The Blind Tiger — BGC',
+      vipOnly: Boolean(ev.vip_only),
+      status: ev.status || 'scheduled',
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function saveEvent(e) {
     e.preventDefault();
+    setErr('');
+    setSaving(true);
+    const body = {
+      title: form.title,
+      startsAt: new Date(form.startsAt).toISOString(),
+      branch: form.branch,
+      vipOnly: form.vipOnly,
+      status: form.status,
+    };
     try {
-      await api('/api/events', {
-        method: 'POST',
-        token,
-        body: { title, startsAt: new Date(startsAt).toISOString(), branch, vipOnly },
-      });
-      setTitle('');
-      setStartsAt('');
+      if (editingId) {
+        await api(`/api/events/${editingId}`, { method: 'PATCH', token, body });
+      } else {
+        await api('/api/events', { method: 'POST', token, body });
+      }
+      resetForm();
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteEvent(ev) {
+    const ok = window.confirm(
+      `Delete “${ev.title}”? Guest list entries for this event will also be removed.`,
+    );
+    if (!ok) return;
+    setErr('');
+    try {
+      await api(`/api/events/${ev.id}`, { method: 'DELETE', token });
+      if (editingId === ev.id) resetForm();
       await load();
     } catch (e) {
       setErr(e.message);
     }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <h2 className="page-title">Calendar & Events</h2>
+        <p className="page-sub">Schedule nights, VIP pours, and guest-list events</p>
+        <div className="page-loading">
+          <span className="page-loading-dot" />
+          Loading events…
+        </div>
+      </>
+    );
   }
 
   return (
@@ -44,36 +127,108 @@ export default function EventsPage() {
       {err && <p className="error">{err}</p>}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>New event</h3>
-        <form onSubmit={createEvent}>
+        <h3 style={{ marginTop: 0 }}>{editingId ? 'Edit event' : 'New event'}</h3>
+        <form onSubmit={saveEvent}>
           <label>Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+          <input
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            required
+          />
           <label>Starts at</label>
-          <EventDateTimePicker value={startsAt} onChange={setStartsAt} required />
+          <EventDateTimePicker
+            value={form.startsAt}
+            onChange={(startsAt) => setForm((f) => ({ ...f, startsAt }))}
+            required
+          />
           <label>Branch</label>
-          <input value={branch} onChange={(e) => setBranch(e.target.value)} />
+          <input
+            value={form.branch}
+            onChange={(e) => setForm((f) => ({ ...f, branch: e.target.value }))}
+          />
+          <label>Status</label>
+          <select
+            value={form.status}
+            onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+          >
+            <option value="scheduled">scheduled</option>
+            <option value="live">live</option>
+            <option value="completed">completed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none' }}>
-            <input type="checkbox" checked={vipOnly} onChange={(e) => setVipOnly(e.target.checked)} style={{ width: 'auto' }} />
+            <input
+              type="checkbox"
+              checked={form.vipOnly}
+              onChange={(e) => setForm((f) => ({ ...f, vipOnly: e.target.checked }))}
+              style={{ width: 'auto' }}
+            />
             VIP / VVIP room event only
           </label>
-          <button className="btn" type="submit" disabled={!startsAt}>Create event</button>
+          <div className="row-actions" style={{ marginTop: 12 }}>
+            <button className="btn" type="submit" disabled={!form.startsAt || saving}>
+              {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create event'}
+            </button>
+            {editingId && (
+              <button className="btn btn-secondary" type="button" onClick={resetForm}>
+                Cancel edit
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>All events</h3>
         <table>
-          <thead><tr><th>Title</th><th>When</th><th>Branch</th><th>Status</th><th>VIP</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>When</th>
+              <th>Branch</th>
+              <th>Status</th>
+              <th>VIP</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody>
-            {events.map((ev) => (
-              <tr key={ev.id}>
-                <td>{ev.title}</td>
-                <td>{formatDate(ev.starts_at)}</td>
-                <td>{ev.branch}</td>
-                <td><span className="badge badge-gold">{ev.status}</span></td>
-                <td>{ev.vip_only ? 'Yes' : '—'}</td>
+            {events.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ color: 'var(--muted)' }}>
+                  No events yet.
+                </td>
               </tr>
-            ))}
+            ) : (
+              events.map((ev) => (
+                <tr key={ev.id}>
+                  <td>{ev.title}</td>
+                  <td>{formatDate(ev.starts_at)}</td>
+                  <td>{ev.branch}</td>
+                  <td>
+                    <span className="badge badge-gold">{ev.status}</span>
+                  </td>
+                  <td>{ev.vip_only ? 'Yes' : '—'}</td>
+                  <td>
+                    <div className="row-actions">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => startEdit(ev)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger"
+                        onClick={() => deleteEvent(ev)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

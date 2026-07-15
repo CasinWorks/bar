@@ -27,12 +27,31 @@ abstract final class AppColors {
   static const neutral900 = Color(0xFF171717);
   static const neutral950 = Color(0xFF0A0A0A);
 
+  /// In Time — neon green clock (not yellow/chartreuse).
+  static const timerNeon = Color(0xFF39FF14);
+  static const timerNeonCore = Color(0xFF7CFF66);
+  static const timerNeonGlow = Color(0xFF00E676);
+  static const timerNeonDeep = Color(0xFF00C853);
+  static const timerWarning = Color(0xFFFFE566);
+  static const timerCritical = Color(0xFFFF3B3B);
+
   static Color timerColor(Duration remaining, {bool isCheckedIn = true}) {
-    if (!isCheckedIn) return goldBright;
+    if (!isCheckedIn) return timerNeon;
     final minutes = remaining.inMinutes;
-    if (minutes < 5) return dangerRed;
-    if (minutes < 15) return warningYellow;
-    return successGreen;
+    if (minutes < 5) return timerCritical;
+    if (minutes < 15) return timerWarning;
+    return timerNeon;
+  }
+
+  /// Soft outer glow for digital timer digits (In Time look).
+  static List<Shadow> timerGlow(Color color, {double intensity = 1}) {
+    final i = intensity.clamp(0.4, 1.6);
+    return [
+      Shadow(color: color.withValues(alpha: 0.95 * i), blurRadius: 2 * i),
+      Shadow(color: color.withValues(alpha: 0.75 * i), blurRadius: 8 * i),
+      Shadow(color: color.withValues(alpha: 0.45 * i), blurRadius: 18 * i),
+      Shadow(color: color.withValues(alpha: 0.22 * i), blurRadius: 32 * i),
+    ];
   }
 
   static String timerLabel(Duration remaining, {bool isCheckedIn = true}) {

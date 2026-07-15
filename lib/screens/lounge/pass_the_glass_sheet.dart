@@ -166,10 +166,11 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
             const SizedBox(height: 8),
             Text(
               'Spendable: ${state.formatDuration(spendable)}',
-              style: const TextStyle(
-                color: AppColors.successGreen,
+              style: TextStyle(
+                color: AppColors.timerNeon,
                 fontWeight: FontWeight.w900,
                 fontSize: 12,
+                shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.5),
               ),
             ),
             const SizedBox(height: 16),

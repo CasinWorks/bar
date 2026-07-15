@@ -161,7 +161,7 @@ export default function TimeLoadPage() {
             <div className="load-preview">
               <div>
                 <span className="stat-label">Credits to wallet</span>
-                <div className="stat-value">{preview.totalMinutes} min</div>
+                <div className="stat-value stat-timer">{preview.totalMinutes} min</div>
               </div>
               <div>
                 <span className="stat-label">

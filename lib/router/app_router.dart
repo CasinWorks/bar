@@ -44,30 +44,38 @@ class AppRouter {
         // Members cannot access staff scanner
         if (loc == '/staff') return routeForMemberState(app);
 
-        final buyTimeRoutes = loc == '/buy-time' || loc == '/buy-time/checkout';
+        // Exit receipt wins over every other member redirect.
+        if (app.hasCheckoutReceipt || app.sessionPhase == SessionPhase.completed) {
+          if (loc != '/summary') return '/summary';
+          return null;
+        }
+
+        // Guest Buy Time / in-app checkout temporarily disabled — loads happen at the club desk.
+        if (loc == '/buy-time' || loc == '/buy-time/checkout' || loc == '/checkout') {
+          if (app.sessionPhase == SessionPhase.paidAwaitingEntry) return '/entry';
+          if (app.sessionPhase == SessionPhase.insideClub) return '/lounge';
+          if (app.hasCheckoutReceipt ||
+              app.sessionPhase == SessionPhase.completed) {
+            return '/summary';
+          }
+          return '/pricing';
+        }
 
         final phase = app.sessionPhase;
         if (phase == SessionPhase.paidAwaitingEntry &&
             loc != '/entry' &&
-            loc != '/checkout' &&
-            !buyTimeRoutes) {
+            loc != '/checkout') {
           return loc == '/pricing' || loc == '/checkout' ? null : '/entry';
         }
         if (phase == SessionPhase.insideClub &&
-            !buyTimeRoutes &&
             loc != '/exit' &&
             (loc == '/entry' ||
                 loc == '/checkout' ||
                 (loc == '/pricing' && !app.isTimeDepleted))) {
           return '/lounge';
         }
-        if (phase == SessionPhase.awaitingExitScan && loc != '/exit' && !buyTimeRoutes) {
+        if (phase == SessionPhase.awaitingExitScan && loc != '/exit') {
           return '/exit';
-        }
-        // Exit scan complete — lock on summary until the guest starts a new visit.
-        if ((phase == SessionPhase.completed || app.hasCheckoutReceipt) &&
-            loc != '/summary') {
-          return '/summary';
         }
         if (phase == SessionPhase.none && loc == '/lounge') {
           return '/pricing';
@@ -81,6 +89,7 @@ class AppRouter {
         GoRoute(path: '/signup', builder: (_, _) => const SignupScreen()),
         GoRoute(path: '/pricing', builder: (_, _) => const PricingScreen()),
         GoRoute(path: '/checkout', builder: (_, _) => const CheckoutScreen()),
+        // Routes kept so deep links don't crash; redirect above sends guests away.
         GoRoute(path: '/buy-time', builder: (_, _) => const BuyTimeScreen()),
         GoRoute(
           path: '/buy-time/checkout',

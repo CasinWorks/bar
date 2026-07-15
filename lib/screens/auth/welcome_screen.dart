@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -10,9 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
+import '../../services/tiger_sound_service.dart';
 
 const _kWelcomeSeenKey = 'welcome_intro_seen_v2';
-const _kWelcomeSoundKey = 'welcome_sound_enabled';
 
 /// One full-screen scene per idea — with theater beats that stay calm.
 class WelcomeScreen extends StatefulWidget {
@@ -34,8 +33,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   int _page = 0;
   bool _ready = false;
   bool _seenBefore = false;
-  bool _soundEnabled = false;
-  final _knock = AudioPlayer();
+  bool _soundEnabled = true;
+  final _sounds = TigerSoundService.instance;
 
   @override
   void initState() {
@@ -62,8 +61,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   Future<void> _boot() async {
     final prefs = await SharedPreferences.getInstance();
+    await _sounds.ensureLoaded();
     final seen = prefs.getBool(_kWelcomeSeenKey) ?? false;
-    final sound = prefs.getBool(_kWelcomeSoundKey) ?? false;
+    final sound = _sounds.enabled;
     final start = seen ? _pageCount - 1 : 0;
     _pageController = PageController(initialPage: start);
     if (!mounted) return;
@@ -87,21 +87,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _setSoundEnabled(bool on) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kWelcomeSoundKey, on);
+    await _sounds.setEnabled(on);
     if (!mounted) return;
     setState(() => _soundEnabled = on);
-    if (on) _playKnock();
   }
 
   Future<void> _playKnock() async {
-    if (!_soundEnabled) return;
-    try {
-      await _knock.stop();
-      await _knock.play(AssetSource('sounds/velvet_knock.wav'));
-    } catch (_) {
-      // Asset / platform audio optional — haptics still fire.
-    }
+    await _sounds.playKnock();
   }
 
   @override
@@ -109,7 +101,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _pageController?.dispose();
     _pulse.dispose();
     _orb.dispose();
-    _knock.dispose();
     for (final c in _entrances) {
       c.dispose();
     }
@@ -610,11 +601,11 @@ class _WalletStrip extends StatelessWidget {
             width: 7,
             height: 7,
             decoration: BoxDecoration(
-              color: AppColors.successGreen,
+              color: AppColors.timerNeon,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.successGreen.withValues(alpha: 0.7),
+                  color: AppColors.timerNeon.withValues(alpha: 0.7),
                   blurRadius: 8,
                 ),
               ],
@@ -626,7 +617,8 @@ class _WalletStrip extends StatelessWidget {
             style: GoogleFonts.shareTechMono(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: AppColors.goldBright,
+              color: AppColors.timerNeon,
+              shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.85),
             ),
           ),
           const Spacer(),

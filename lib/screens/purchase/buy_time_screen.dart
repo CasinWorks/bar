@@ -198,9 +198,9 @@ class _BalanceCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.successGreen.withValues(alpha: 0.08),
+        color: AppColors.timerNeon.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.35)),
+        border: Border.all(color: AppColors.timerNeon.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,23 +209,28 @@ class _BalanceCard extends StatelessWidget {
             Text(
               'ACTIVE PASS: ${state.formatDuration(state.timeRemaining)}',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.successGreen,
+                    color: AppColors.timerNeon,
                     fontWeight: FontWeight.w900,
+                    shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.55),
                   ),
             ),
             if (state.timeBalance > 0) ...[
               const SizedBox(height: 4),
               Text(
                 'Saved wallet: ${state.formatDuration(state.timeBalance)}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontSize: 10,
+                      color: AppColors.timerNeonGlow,
+                    ),
               ),
             ],
           ] else ...[
             Text(
               'SAVED TIME: ${state.formatDuration(state.timeBalance)}',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.successGreen,
+                    color: AppColors.timerNeon,
                     fontWeight: FontWeight.w900,
+                    shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.55),
                   ),
             ),
           ],

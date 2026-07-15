@@ -51,6 +51,16 @@ class _GradientLayerState extends State<_GradientLayer>
   }
 
   @override
+  void didUpdateWidget(_GradientLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animate && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!widget.animate && _controller.isAnimating) {
+      _controller.stop();
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -70,15 +80,44 @@ class _GradientLayerState extends State<_GradientLayer>
       );
     }
 
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF1C0500), AppColors.darkBackground, Color(0xFF0A0000)],
-          stops: [0.0, 0.5, 1.0],
+    if (!widget.animate) {
+      return const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1C0500), AppColors.darkBackground, Color(0xFF0A0000)],
+            stops: [0.0, 0.5, 1.0],
+          ),
         ),
-      ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        final top = Color.lerp(
+          const Color(0xFF1C0500),
+          const Color(0xFF2A0C00),
+          t,
+        )!;
+        final mid = Color.lerp(
+          AppColors.darkBackground,
+          const Color(0xFF120505),
+          t,
+        )!;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(-0.2 + t * 0.4, -1),
+              end: Alignment(0.2 - t * 0.4, 1),
+              colors: [top, mid, const Color(0xFF0A0000)],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        );
+      },
     );
   }
 }

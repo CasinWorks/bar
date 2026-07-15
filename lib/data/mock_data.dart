@@ -223,10 +223,26 @@ abstract final class MockData {
         ),
         Challenge(
           id: 'chal-4',
-          title: 'Elite Socialite',
+          title: 'Toast 2 Strangers',
           icon: 'social',
-          targetCount: 3,
+          targetCount: 2,
           points: 30,
+          category: ChallengeCategory.social,
+        ),
+        Challenge(
+          id: 'chal-5',
+          title: 'Win a Duo Beat',
+          icon: 'game',
+          targetCount: 1,
+          points: 35,
+          category: ChallengeCategory.game,
+        ),
+        Challenge(
+          id: 'chal-6',
+          title: 'Tip the House',
+          icon: 'drink',
+          targetCount: 1,
+          points: 20,
           category: ChallengeCategory.social,
         ),
       ];

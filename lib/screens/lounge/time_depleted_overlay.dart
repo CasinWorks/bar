@@ -30,7 +30,7 @@ class TimeDepletedOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Your time currency has run out. Your club pass stays active — buy more time to continue, or exit at the door.',
+                'Your time currency has run out. Ask the house to load more minutes, or request exit at the door.',
                 style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
@@ -45,20 +45,21 @@ class TimeDepletedOverlay extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const Spacer(),
-              TigerButton(
-                label: 'BUY TIME',
-                icon: Icons.bolt,
-                onPressed: () => context.push('/buy-time'),
+              Text(
+                'SEE THE HOUSE FOR MORE TIME',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.goldBright,
+                      fontWeight: FontWeight.w900,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Time loads are done at the club — not in the app.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              if (state.canPurchaseNewPass)
-                TigerButton(
-                  label: 'REDEEM SOCIALITE PASS',
-                  icon: Icons.card_membership,
-                  secondary: true,
-                  onPressed: () => context.push('/pricing'),
-                ),
-              if (state.canPurchaseNewPass) const SizedBox(height: 12),
               TigerButton(
                 label: 'REQUEST EXIT',
                 icon: Icons.logout,

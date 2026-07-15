@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import AppLoader from './components/AppLoader';
 import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -12,7 +13,7 @@ import HrPage from './pages/HrPage';
 
 function Protected({ children }) {
   const { session, profile, loading, accessError, signOut } = useAuth();
-  if (loading) return <div className="login-page">Loading…</div>;
+  if (loading) return <AppLoader label="Opening admin suite…" />;
   if (!session) return <Navigate to="/login" replace />;
   if (!profile) {
     return (

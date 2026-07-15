@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AppLoader from '../components/AppLoader';
 
 export default function LoginPage() {
   const { signIn, profile, loading } = useAuth();
@@ -9,7 +10,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (!loading && profile) return <Navigate to="/app" replace />;
+  if (loading) return <AppLoader label="Checking session…" />;
+  if (profile) return <Navigate to="/app" replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();

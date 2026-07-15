@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const links = [
@@ -13,19 +14,35 @@ const links = [
 export default function Layout() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const main = document.querySelector('.main');
+    if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <h1>BLIND TIGER<br />ADMIN</h1>
+        <h1>
+          BLIND TIGER
+          <br />
+          ADMIN
+        </h1>
         {links.map((l) => (
-          <NavLink key={l.to} to={l.to} end={l.end} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+          <NavLink
+            key={l.to}
+            to={l.to}
+            end={l.end}
+            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+          >
             {l.label}
           </NavLink>
         ))}
         <div style={{ flex: 1 }} />
         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-          {profile?.name}<br />
+          {profile?.name}
+          <br />
           <span className="badge badge-gold">{profile?.role}</span>
         </div>
         <button

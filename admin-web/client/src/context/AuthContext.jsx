@@ -24,11 +24,26 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session) loadProfile(data.session.access_token).finally(() => setLoading(false));
-      else setLoading(false);
-    });
+    let cancelled = false;
+
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (cancelled) return;
+        setSession(data.session);
+        if (data.session) {
+          await loadProfile(data.session.access_token);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSession(null);
+          setProfile(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
@@ -39,7 +54,10 @@ export function AuthProvider({ children }) {
       }
     });
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const value = {

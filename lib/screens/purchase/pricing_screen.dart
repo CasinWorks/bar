@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../data/mock_data.dart';
-import '../../models/blind_tiger_models.dart';
 import '../../models/club_session.dart';
 import '../../providers/app_state.dart';
 import '../lounge/pass_the_glass_sheet.dart';
@@ -46,9 +45,9 @@ class PricingScreen extends StatelessWidget {
                 Text(
                   showPassPurchase
                       ? (extendingPass
-                          ? 'Time is currency — your pass stays active. Add hours to continue your evening.'
-                          : 'Buy club hours to spend inside. Your pass stays active until time runs out.')
-                      : 'You still have $loadLabel on your account. Use your balance or buy more time — a new pass unlocks under 5 minutes.',
+                          ? 'Your pass stays active. Ask the house to load more hours.'
+                          : 'Redeem club hours loaded by the house, or use your wallet balance.')
+                      : 'You still have $loadLabel on your account. Use your balance — new loads are done at the club.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
@@ -57,9 +56,9 @@ class PricingScreen extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.successGreen.withValues(alpha: 0.1),
+                      color: AppColors.timerNeon.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.35)),
+                      border: Border.all(color: AppColors.timerNeon.withValues(alpha: 0.35)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -67,22 +66,29 @@ class PricingScreen extends StatelessWidget {
                         Text(
                           'TOTAL LOAD: $loadLabel',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: AppColors.successGreen,
+                                color: AppColors.timerNeon,
                                 fontWeight: FontWeight.w900,
+                                shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.55),
                               ),
                         ),
                         if (hasWallet) ...[
                           const SizedBox(height: 4),
                           Text(
                             'Saved wallet: ${state.formatDuration(state.timeBalance)}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontSize: 10,
+                                  color: AppColors.timerNeonGlow,
+                                ),
                           ),
                         ],
                         if (extendingPass) ...[
                           const SizedBox(height: 4),
                           Text(
                             'Active pass: ${state.formatDuration(state.timeRemaining)}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontSize: 10,
+                                  color: AppColors.timerNeonGlow,
+                                ),
                           ),
                         ],
                       ],
@@ -90,10 +96,13 @@ class PricingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                 ],
-                TigerButton(
-                  label: 'BUY TIME',
-                  icon: Icons.bolt,
-                  onPressed: () => context.push('/buy-time'),
+                LuxuryCard(
+                  padding: const EdgeInsets.all(14),
+                  child: Text(
+                    'Time loads are temporarily in-club only — see the house / admin desk.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TigerButton(
@@ -128,49 +137,6 @@ class PricingScreen extends StatelessWidget {
                 ],
                 if (showPassPurchase) ...[
                   const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.goldBrushed.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.goldBrushed.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.people, color: AppColors.goldBright, size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              'GCash Referral Active',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.goldBright,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.goldBrushed,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '15% OFF',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Text(
                     'SELECT BRANCH',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
@@ -193,88 +159,26 @@ class PricingScreen extends StatelessWidget {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: ListView(
-                      children: MockData.priceTiers.map((tier) {
-                        final selected = state.selectedTier.id == tier.id;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _TierCard(
-                            tier: tier,
-                            selected: selected,
-                            onTap: () => state.setSelectedTier(tier),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                  const Spacer(),
                   LuxuryCard(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Total Charged:', style: Theme.of(context).textTheme.bodyMedium),
-                            Text(
-                              '₱${state.selectedTier.discountedPrice} • ${state.selectedTier.duration}m Club Pass',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: AppColors.goldBright,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
+                        const Icon(Icons.storefront, color: AppColors.goldBright, size: 32),
+                        const SizedBox(height: 10),
                         Text(
-                          'PAYMENT METHOD',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontSize: 8,
-                                letterSpacing: 1,
+                          'IN-CLUB TIME LOADS ONLY',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: AppColors.goldBright,
+                                fontWeight: FontWeight.w900,
                               ),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: PaymentMethod.values.map((method) {
-                            final selected = state.paymentMethod == method;
-                            return Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 2),
-                                child: GestureDetector(
-                                  onTap: () => state.setPaymentMethod(method),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 6),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: selected
-                                            ? AppColors.goldBrushed
-                                            : AppColors.neutral900,
-                                      ),
-                                      color: selected
-                                          ? Colors.white.withValues(alpha: 0.05)
-                                          : Colors.transparent,
-                                    ),
-                                    child: Text(
-                                      method.label,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        color: selected ? AppColors.goldBright : AppColors.neutral400,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 12),
-                        TigerButton(
-                          label: extendingPass ? 'ADD HOURS TO PASS' : 'SECURE TRANSACTION',
-                          icon: Icons.shield,
-                          onPressed: () => context.go('/checkout'),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Ask the house or admin desk to load minutes to your account, then use your time balance to enter.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
@@ -289,107 +193,5 @@ class PricingScreen extends StatelessWidget {
   }
 }
 
-class _TierCard extends StatelessWidget {
-  const _TierCard({
-    required this.tier,
-    required this.selected,
-    required this.onTap,
-  });
+// _TierCard (in-app pass purchase UI) temporarily removed — restore with Buy Time.
 
-  final PriceTier tier;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: LuxuryCard(
-        highlighted: selected,
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (tier.popular)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.tigerOrange, AppColors.goldBrushed],
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'RECOMMENDED',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 7,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '${tier.duration}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textLight,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'MINUTES',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 9),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    tier.tagline,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
-                  ),
-                  Text(
-                    tier.valueProp,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 9),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '₱${tier.price}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        decoration: TextDecoration.lineThrough,
-                        fontSize: 10,
-                      ),
-                ),
-                Text(
-                  '₱${tier.discountedPrice}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.goldBright,
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Icon(
-                  selected ? Icons.check_circle : Icons.circle_outlined,
-                  color: selected ? AppColors.goldBrushed : AppColors.neutral500,
-                  size: 16,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

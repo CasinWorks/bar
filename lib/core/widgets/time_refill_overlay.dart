@@ -107,7 +107,7 @@ class _TimeRefillDialogState extends State<_TimeRefillDialog>
   Widget build(BuildContext context) {
     final delta = widget.toSeconds - widget.fromSeconds;
     final increasing = delta > 0;
-    final accent = increasing ? AppColors.successGreen : AppColors.tigerOrange;
+    final accent = increasing ? AppColors.timerNeon : AppColors.timerCritical;
     final label = increasing ? 'TIME LOADED' : 'TIME SPENT';
 
     return Material(

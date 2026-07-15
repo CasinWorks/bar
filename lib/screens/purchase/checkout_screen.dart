@@ -29,7 +29,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('You still have time on your account. Use Buy Time or your balance.'),
+          content: Text('You still have time on your account. Use your balance, or ask the house to load more.'),
         ),
       );
       context.go('/pricing');

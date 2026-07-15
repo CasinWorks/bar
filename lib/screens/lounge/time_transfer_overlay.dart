@@ -247,6 +247,7 @@ class _Node extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
                 color: accent,
+                shadows: AppColors.timerGlow(accent, intensity: 0.7),
               ),
             ),
           ),

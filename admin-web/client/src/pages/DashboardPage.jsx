@@ -25,7 +25,7 @@ export default function DashboardPage() {
         <div className="card"><div className="stat-value">{stats.memberCount}</div><div className="stat-label">Members</div></div>
         <div className="card"><div className="stat-value">{stats.activeSessions}</div><div className="stat-label">Active visits</div></div>
         <div className="card"><div className="stat-value">{formatPeso(stats.cashToday)}</div><div className="stat-label">Cash today</div></div>
-        <div className="card"><div className="stat-value">{stats.minutesLoadedToday}m</div><div className="stat-label">Time loaded today</div></div>
+        <div className="card"><div className="stat-value stat-timer">{stats.minutesLoadedToday}m</div><div className="stat-label">Time loaded today</div></div>
       </div>
 
       <div className="card">

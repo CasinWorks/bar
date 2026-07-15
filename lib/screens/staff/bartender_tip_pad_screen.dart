@@ -182,7 +182,7 @@ class _BartenderTipPadScreenState extends State<BartenderTipPadScreen>
                       padding: const EdgeInsets.all(14),
                       child: Row(
                         children: [
-                          const Icon(Icons.account_balance_wallet, color: AppColors.successGreen),
+                          const Icon(Icons.account_balance_wallet, color: AppColors.timerNeon),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -194,7 +194,7 @@ class _BartenderTipPadScreenState extends State<BartenderTipPadScreen>
                                 ),
                                 AnimatedTimeDisplay(
                                   seconds: state.timeBalance,
-                                  color: AppColors.successGreen,
+                                  color: AppColors.timerNeon,
                                   fontSize: 18,
                                 ),
                               ],

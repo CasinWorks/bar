@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/animated_time_display.dart';
 import '../../core/widgets/lattice_background.dart';
+import '../../core/widgets/tiger_motion.dart';
 import '../../models/blind_tiger_models.dart';
 import '../../providers/app_state.dart';
 import 'lounge_tabs.dart';
@@ -23,36 +24,62 @@ class ActiveLoungeScreen extends StatelessWidget {
 
     return Scaffold(
       body: LatticeBackground(
+        animate: true,
         child: Stack(
           children: [
             SafeArea(
               child: Column(
                 children: [
-                  _Header(state: state),
-                  _TimerCard(
-                    timeRemaining: state.timeRemaining,
-                    timerColor: timerColor,
-                    points: state.points,
-                    tier: state.memberTier,
-                    isDepleted: state.isTimeDepleted,
-                    onBuyTime: () => context.push('/buy-time'),
-                    onPassGlass: () => PassTheGlassSheet.show(context),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 40),
+                    child: _Header(state: state),
                   ),
-                  Expanded(child: _TabBody(tab: state.activeTab)),
-                  _TabBar(
-                    active: state.activeTab,
-                    onChanged: state.setActiveTab,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 120),
+                    child: NeonPulse(
+                      color: timerColor,
+                      enabled: !state.isTimeDepleted,
+                      child: _TimerCard(
+                        timeRemaining: state.timeRemaining,
+                        timerColor: timerColor,
+                        points: state.points,
+                        tier: state.memberTier,
+                        isDepleted: state.isTimeDepleted,
+                        onPassGlass: () => PassTheGlassSheet.show(context),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      child: KeyedSubtree(
+                        key: ValueKey(state.activeTab),
+                        child: _TabBody(tab: state.activeTab),
+                      ),
+                    ),
+                  ),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 200),
+                    child: _TabBar(
+                      active: state.activeTab,
+                      onChanged: state.setActiveTab,
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: TigerButton(
-                      label: 'REQUEST EXIT — SHOW QR AT DOOR',
-                      icon: Icons.logout,
-                      secondary: true,
-                      onPressed: () async {
-                        await state.requestExit();
-                        if (context.mounted) context.go('/exit');
-                      },
+                    child: FadeSlideIn(
+                      delay: const Duration(milliseconds: 260),
+                      child: TigerButton(
+                        label: 'REQUEST EXIT — SHOW QR AT DOOR',
+                        icon: Icons.logout,
+                        secondary: true,
+                        onPressed: () async {
+                          await state.requestExit();
+                          if (context.mounted) context.go('/exit');
+                        },
+                      ),
                     ),
                   ),
                 ],
@@ -122,7 +149,6 @@ class _TimerCard extends StatelessWidget {
     required this.points,
     required this.tier,
     required this.isDepleted,
-    required this.onBuyTime,
     required this.onPassGlass,
   });
 
@@ -131,7 +157,6 @@ class _TimerCard extends StatelessWidget {
   final int points;
   final MemberTier tier;
   final bool isDepleted;
-  final VoidCallback onBuyTime;
   final VoidCallback onPassGlass;
 
   @override
@@ -166,21 +191,11 @@ class _TimerCard extends StatelessWidget {
             style: TextStyle(color: isDepleted ? AppColors.tigerOrange : timerColor, fontSize: 10, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TigerButton(label: 'BUY TIME', icon: Icons.bolt, onPressed: onBuyTime),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TigerButton(
-                  label: 'TIP BAR',
-                  icon: Icons.nfc,
-                  secondary: true,
-                  onPressed: () => TipBartenderSheet.show(context),
-                ),
-              ),
-            ],
+          TigerButton(
+            label: 'TIP BAR',
+            icon: Icons.nfc,
+            secondary: true,
+            onPressed: () => TipBartenderSheet.show(context),
           ),
           const SizedBox(height: 8),
           TigerButton(

@@ -7,6 +7,7 @@ import '../../core/widgets/lattice_background.dart';
 import '../../models/club_session.dart';
 import '../../models/qr_payload.dart';
 import '../../providers/app_state.dart';
+import '../../services/tiger_sound_service.dart';
 
 import 'bartender_tip_pad_screen.dart';
 
@@ -143,6 +144,7 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
         _pendingManualLabel = null;
         _phase = _ScannerPhase.scanning;
       });
+      await TigerSoundService.instance.playSoftThud();
       await _resumeScanner();
       return;
     }
@@ -156,6 +158,7 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
       _phase = _ScannerPhase.success;
       _error = null;
     });
+    await TigerSoundService.instance.playDoorLatch();
     await _successAnim.forward(from: 0);
   }
 

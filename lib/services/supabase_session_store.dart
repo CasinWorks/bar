@@ -114,14 +114,16 @@ class SupabaseSessionStore extends SessionStoreDelegate {
     final session = await fetchSessionFresh(sessionId);
     if (session == null || session.phase != SessionPhase.paidAwaitingEntry) return;
 
+    final now = DateTime.now();
     await _client.from('club_sessions').update({
       'phase': ClubSessionRecord.phaseToDb(SessionPhase.insideClub),
       'remaining_seconds': session.remainingSeconds,
-      'entered_at': DateTime.now().toIso8601String(),
+      // Always UTC+Z so Postgres timestamptz is unambiguous.
+      'entered_at': now.toUtc().toIso8601String(),
     }).eq('id', sessionId);
 
     session.phase = SessionPhase.insideClub;
-    session.enteredAt = DateTime.now();
+    session.enteredAt = now;
     _cache[sessionId] = session;
     notifyListeners();
   }
@@ -160,13 +162,14 @@ class SupabaseSessionStore extends SessionStoreDelegate {
     final session = await fetchSession(sessionId);
     if (session == null || session.phase != SessionPhase.awaitingExitScan) return;
 
+    final now = DateTime.now();
     await _client.from('club_sessions').update({
       'phase': ClubSessionRecord.phaseToDb(SessionPhase.completed),
-      'exited_at': DateTime.now().toIso8601String(),
+      'exited_at': now.toUtc().toIso8601String(),
     }).eq('id', sessionId);
 
     session.phase = SessionPhase.completed;
-    session.exitedAt = DateTime.now();
+    session.exitedAt = now;
     _cache[sessionId] = session;
     notifyListeners();
   }
@@ -195,13 +198,14 @@ class SupabaseSessionStore extends SessionStoreDelegate {
     final session = await fetchSession(sessionId);
     if (session == null || session.phase != SessionPhase.paidAwaitingEntry) return;
 
+    final now = DateTime.now();
     await _client.from('club_sessions').update({
       'phase': ClubSessionRecord.phaseToDb(SessionPhase.completed),
-      'exited_at': DateTime.now().toIso8601String(),
+      'exited_at': now.toUtc().toIso8601String(),
     }).eq('id', sessionId);
 
     session.phase = SessionPhase.completed;
-    session.exitedAt = DateTime.now();
+    session.exitedAt = now;
     _cache[sessionId] = session;
     notifyListeners();
   }

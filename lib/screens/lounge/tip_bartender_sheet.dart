@@ -137,10 +137,11 @@ class _TipBartenderSheetState extends State<TipBartenderSheet> {
                 const SizedBox(height: 8),
                 Text(
                   'Spendable: ${state.formatDuration(state.ownedTimeSeconds)}',
-                  style: const TextStyle(
-                    color: AppColors.successGreen,
+                  style: TextStyle(
+                    color: AppColors.timerNeon,
                     fontWeight: FontWeight.w900,
                     fontSize: 12,
+                    shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.5),
                   ),
                 ),
                 const SizedBox(height: 16),
