@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../core/config/door_qr_bypass.dart' as door_qr;
+import '../core/theme/app_colors.dart';
 import '../data/mock_data.dart';
 import '../models/blind_tiger_models.dart';
+import '../models/club_packages.dart';
 import '../models/club_session.dart';
 import '../models/member_user.dart';
 import '../models/qr_payload.dart';
@@ -18,7 +21,10 @@ import '../services/time_gift_service.dart';
 import '../services/time_live_activity_service.dart';
 import '../services/tiger_sound_service.dart';
 import '../services/social_play_service.dart';
+import '../services/safety_social_service.dart';
+import '../services/push_notification_service.dart';
 import '../models/time_gift.dart';
+import '../models/time_low_alert.dart';
 import '../models/social_play.dart';
 
 class AppState extends ChangeNotifier {
@@ -32,15 +38,19 @@ class AppState extends ChangeNotifier {
     TimeLiveActivityService? liveActivityService,
     TigerSoundService? soundService,
     SocialPlayService? socialPlayService,
-  })  : _auth = authService ?? AuthService(),
-        _payment = paymentService ?? PaymentService(),
-        _qr = qrService ?? QrService(),
-        _sessionStore = sessionStore ?? SessionStore.instance,
-        _gifts = timeGiftService ?? TimeGiftService(),
-        _leaderboardService = leaderboardService ?? LeaderboardService(),
-        _liveActivity = liveActivityService ?? TimeLiveActivityService(),
-        _sounds = soundService ?? TigerSoundService.instance,
-        _social = socialPlayService ?? SocialPlayService();
+    SafetySocialService? safetySocialService,
+    PushNotificationService? pushNotificationService,
+  }) : _auth = authService ?? AuthService(),
+       _payment = paymentService ?? PaymentService(),
+       _qr = qrService ?? QrService(),
+       _sessionStore = sessionStore ?? SessionStore.instance,
+       _gifts = timeGiftService ?? TimeGiftService(),
+       _leaderboardService = leaderboardService ?? LeaderboardService(),
+       _liveActivity = liveActivityService ?? TimeLiveActivityService(),
+       _sounds = soundService ?? TigerSoundService.instance,
+       _social = socialPlayService ?? SocialPlayService(),
+       _safety = safetySocialService ?? SafetySocialService(),
+       _push = pushNotificationService ?? PushNotificationService();
 
   final AuthService _auth;
   final PaymentService _payment;
@@ -51,6 +61,8 @@ class AppState extends ChangeNotifier {
   final TimeLiveActivityService _liveActivity;
   final TigerSoundService _sounds;
   final SocialPlayService _social;
+  final SafetySocialService _safety;
+  final PushNotificationService _push;
   final _uuid = const Uuid();
 
   bool _isLoading = true;
@@ -65,6 +77,7 @@ class AppState extends ChangeNotifier {
   Timer? _timer;
   Timer? _qrRefreshTimer;
   Timer? _syncTimer;
+  Timer? _autoBadgeOutTimer;
   void Function(StaffTipReceived)? _staffTipCallback;
   int _staffTipWatchBalance = 0;
   String? _lastHandledTipId;
@@ -73,12 +86,24 @@ class AppState extends ChangeNotifier {
   int _timerSyncDebt = 0;
   int _drinksOrdered = 0;
   int _localTimeMutations = 0;
+  bool _walletBusy = false;
   PendingWalletCredit? _pendingWalletCredit;
+
   /// Frozen receipt after exit scan — survives until [beginNewVisit].
   ClubSessionRecord? _checkoutReceipt;
   static const _checkoutReceiptKey = 'checkout_receipt_v1';
   int? _lastLiveActivitySeconds;
-  bool _timerLowSoundPlayed = false;
+  bool _appInForeground = true;
+  final Set<String> _pushedAlertIds = {};
+  String? _liveSocialTitle;
+  String? _liveSocialBody;
+  String? _liveSocialSender;
+  /// Thresholds (minutes) already warned for this descent; cleared when time
+  /// climbs back above that mark (e.g. after buying more time).
+  final Set<int> _firedTimeLowThresholds = {};
+  final List<TimeLowAlert> _timeLowAlertQueue = [];
+  bool _timeLowThresholdsSeeded = false;
+  String? _lastAnnouncedBand;
 
   AvatarConfig _avatar = const AvatarConfig();
   int _points = 108;
@@ -94,6 +119,24 @@ class AppState extends ChangeNotifier {
   SocialMeet? _activeMeet;
   Timer? _presencePoll;
   final Set<String> _awardedMeetCompletions = {};
+  List<FriendProfile> _friendSearchResults = [];
+  List<FriendRequest> _friendRequests = [];
+  List<FriendProfile> _mutualFriendsNearby = [];
+  final Set<String> _blockedMemberIds = {};
+  FriendPing? _lastFriendPing;
+  List<FriendPing> _incomingPings = [];
+  /// FIFO queues — head is what [SocialAlertsHost] should show next.
+  final List<FriendPing> _pingAlertQueue = [];
+  final List<FriendRequest> _requestAlertQueue = [];
+  final Set<String> _seenInboundRequestIds = {};
+  final Set<String> _ackedPingIds = {};
+  Timer? _socialInboxPoll;
+  SafetyReport? _lastSafetyReport;
+  RideAssistRequest? _lastRideAssistRequest;
+  InsuranceIncident? _lastInsuranceIncident;
+  bool _needsMemberTutorial = false;
+
+  static const _tutorialSeenPrefix = 'member_tutorial_seen_v1_';
 
   bool get isLoading => _isLoading;
   bool get usesCloud => _auth.usesSupabase;
@@ -101,6 +144,13 @@ class AppState extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   bool get isStaff => _user?.isStaff ?? false;
   bool get isMember => _user?.isMember ?? false;
+  /// Entry door QR may be skipped for allowlisted emails / VIP whitelist.
+  bool get canSkipDoorQr => door_qr.canSkipDoorQrScan(
+        email: _user?.email,
+        isWhitelisted: _user?.isWhitelisted ?? false,
+      );
+  bool get needsMemberTutorial =>
+      _needsMemberTutorial && isMember && !isStaff;
   ClubSessionRecord? get session => _session ?? _checkoutReceipt;
   bool get hasCheckoutReceipt => _checkoutReceipt != null;
   ClubSessionRecord? get checkoutReceipt => _checkoutReceipt;
@@ -108,6 +158,7 @@ class AppState extends ChangeNotifier {
     if (_checkoutReceipt != null) return SessionPhase.completed;
     return _session?.phase ?? SessionPhase.none;
   }
+
   PriceTier get selectedTier => _selectedTier;
   int get selectedTimeMinutes => _selectedTimeMinutes;
   String get selectedTimePackageId => _selectedTimePackageId;
@@ -129,6 +180,28 @@ class AppState extends ChangeNotifier {
   String get vibeTag => _vibeTag;
   List<SocialPresence> get whosInside => List.unmodifiable(_whosInside);
   SocialMeet? get activeMeet => _activeMeet;
+  List<FriendProfile> get friendSearchResults =>
+      List.unmodifiable(_friendSearchResults);
+  List<FriendRequest> get friendRequests => List.unmodifiable(_friendRequests);
+  List<FriendProfile> get mutualFriendsNearby =>
+      List.unmodifiable(_mutualFriendsNearby);
+  FriendPing? get lastFriendPing => _lastFriendPing;
+  List<FriendPing> get incomingPings => List.unmodifiable(_incomingPings);
+  FriendPing? get pendingPingAlert =>
+      _pingAlertQueue.isEmpty ? null : _pingAlertQueue.first;
+  FriendRequest? get pendingRequestAlert =>
+      _requestAlertQueue.isEmpty ? null : _requestAlertQueue.first;
+  TimeLowAlert? get pendingTimeLowAlert =>
+      _timeLowAlertQueue.isEmpty ? null : _timeLowAlertQueue.first;
+  int get pendingInboundRequestCount => _friendRequests
+      .where(
+        (r) =>
+            r.direction == 'inbound' && r.status == FriendRequestStatus.pending,
+      )
+      .length;
+  SafetyReport? get lastSafetyReport => _lastSafetyReport;
+  RideAssistRequest? get lastRideAssistRequest => _lastRideAssistRequest;
+  InsuranceIncident? get lastInsuranceIncident => _lastInsuranceIncident;
 
   int get currentRank {
     for (final user in _leaderboard) {
@@ -137,7 +210,8 @@ class AppState extends ChangeNotifier {
     return _leaderboard.length;
   }
 
-  MemberTier get memberTier => MemberTierThresholds.tierForSeconds(spendableTimeSeconds);
+  MemberTier get memberTier =>
+      MemberTierThresholds.tierForSeconds(spendableTimeSeconds);
 
   bool get hasVipRoomAccess =>
       spendableTimeSeconds >= MemberTierThresholds.vipRoomSeconds;
@@ -174,6 +248,11 @@ class AppState extends ChangeNotifier {
   bool get canSpendTime =>
       _session?.phase == SessionPhase.insideClub && timeBalance > 0;
 
+  bool get isInsideClub => _session?.phase == SessionPhase.insideClub;
+
+  /// True while a wallet mutation (order, VIP, toast, tip) is in flight.
+  bool get isWalletBusy => _walletBusy;
+
   int get timeBalance => _user?.timeBalanceSeconds ?? 0;
 
   static const int passPurchaseMinSeconds = 5 * 60;
@@ -196,9 +275,7 @@ class AppState extends ChangeNotifier {
   int get activeTimeSeconds => spendableTimeSeconds;
 
   bool get canUseTimeBalance =>
-      isMember &&
-      sessionPhase == SessionPhase.none &&
-      timeBalance > 0;
+      isMember && sessionPhase == SessionPhase.none && timeBalance > 0;
 
   Future<void> initialize() async {
     _isLoading = true;
@@ -207,6 +284,7 @@ class AppState extends ChangeNotifier {
     await _sessionStore.load();
     await _sounds.ensureLoaded();
     await _liveActivity.init();
+    await _initPushDelivery();
     _user = await _auth.getCurrentUser();
     _sessionStore.addListener(_onSessionStoreChanged);
 
@@ -216,11 +294,125 @@ class AppState extends ChangeNotifier {
         await _restoreActiveSession();
       }
       _syncLiveActivity();
+      await _refreshTutorialFlag();
+      startSocialInboxPolling();
+      unawaited(_registerPushTokens());
     }
 
     _startCurrencyRealtime();
 
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> _initPushDelivery() async {
+    _liveActivity.onPushToken = (token, {required kind}) {
+      unawaited(_safety.registerPushToken(
+        token: token,
+        kind: kind,
+        platform: _pushPlatform,
+        environment: kDebugMode ? 'sandbox' : 'production',
+        bundleId: 'com.intime.inTimeBartender',
+      ));
+    };
+    _push.onDeviceToken = (token) {
+      unawaited(_safety.registerPushToken(
+        token: token,
+        kind: 'fcm',
+        platform: _pushPlatform,
+        environment: kDebugMode ? 'sandbox' : 'production',
+        bundleId: 'com.intime.inTimeBartender',
+      ));
+    };
+    _push.onApnsToken = (token) {
+      unawaited(_safety.registerPushToken(
+        token: token,
+        kind: 'apns',
+        platform: 'ios',
+        environment: kDebugMode ? 'sandbox' : 'production',
+        bundleId: 'com.intime.inTimeBartender',
+      ));
+    };
+    // Foreground: refresh inbox so the island banner can show; skip OS local
+    // banners (island is the in-app path). Background delivery stays on FCM/APNs.
+    _push.shouldShowLocalInForeground = () => !_appInForeground;
+    _push.onForegroundMessage = (_) {
+      if (_user != null && _user!.isMember) {
+        unawaited(refreshSocialInbox());
+      }
+    };
+    await _push.init();
+  }
+
+  String get _pushPlatform =>
+      defaultTargetPlatform == TargetPlatform.android ? 'android' : 'ios';
+
+  Future<void> _registerPushTokens() async {
+    await _push.refreshTokens();
+    final token = _push.deviceToken;
+    if (token != null && token.isNotEmpty) {
+      await _safety.registerPushToken(
+        token: token,
+        kind: 'fcm',
+        platform: _pushPlatform,
+        environment: kDebugMode ? 'sandbox' : 'production',
+        bundleId: 'com.intime.inTimeBartender',
+      );
+    }
+    final apns = _push.apnsToken;
+    if (apns != null && apns.isNotEmpty) {
+      await _safety.registerPushToken(
+        token: apns,
+        kind: 'apns',
+        platform: 'ios',
+        environment: kDebugMode ? 'sandbox' : 'production',
+        bundleId: 'com.intime.inTimeBartender',
+      );
+    }
+    final live = _liveActivity.liveActivityPushToken;
+    if (live != null && live.isNotEmpty) {
+      await _safety.registerPushToken(
+        token: live,
+        kind: 'live_activity',
+        platform: 'ios',
+        environment: kDebugMode ? 'sandbox' : 'production',
+        bundleId: 'com.intime.inTimeBartender',
+      );
+    }
+  }
+
+  /// Call from the root widget when app resumes / pauses.
+  void setAppForeground(bool foreground) {
+    _appInForeground = foreground;
+    if (foreground) {
+      unawaited(refreshSocialInbox());
+      // Re-bind tokens after resume — APNs/FCM can rotate while suspended.
+      if (_user != null && _user!.isMember) {
+        unawaited(_registerPushTokens());
+      }
+      // Re-anchor Live Activity end date from the live wallet (Dart timer may have
+      // paused while suspended; timerInterval keeps ticking from the last end date).
+      _syncLiveActivity(force: true);
+      // Surface any threshold crossed while backgrounded.
+      if (_timeLowAlertQueue.isNotEmpty) notifyListeners();
+    }
+  }
+
+  Future<void> _refreshTutorialFlag() async {
+    if (_user == null || !_user!.isMember || _user!.isStaff) {
+      _needsMemberTutorial = false;
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    _needsMemberTutorial =
+        !(prefs.getBool('$_tutorialSeenPrefix${_user!.id}') ?? false);
+  }
+
+  Future<void> completeMemberTutorial() async {
+    if (_user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('$_tutorialSeenPrefix${_user!.id}', true);
+    _needsMemberTutorial = false;
     notifyListeners();
   }
 
@@ -253,14 +445,21 @@ class AppState extends ChangeNotifier {
         _startTimer();
       }
       _startQrRefresh(QrPurpose.exit);
+      _scheduleAutoBadgeOut(_session);
+      startSocialInboxPolling();
+      _syncLiveActivity(force: true);
     } else if (_session!.phase == SessionPhase.awaitingExitScan) {
       if (timeBalance > 0) {
         _startTimer();
       }
       _startQrRefresh(QrPurpose.exit);
+      _scheduleAutoBadgeOut(_session);
+      _syncLiveActivity(force: true);
     } else if (_session!.phase == SessionPhase.paidAwaitingEntry) {
       _startQrRefresh(QrPurpose.entry);
       _startSyncPolling();
+      _autoBadgeOutTimer?.cancel();
+      await _maybeSkipEntryDoorScan();
     }
   }
 
@@ -306,6 +505,7 @@ class AppState extends ChangeNotifier {
       _timer?.cancel();
       _initLoungeState();
       _startQrRefresh(QrPurpose.exit);
+      _scheduleAutoBadgeOut(updated);
       _syncTimer?.cancel();
       unawaited(_sounds.playDoorLatch());
       _onEnteredClub();
@@ -315,6 +515,14 @@ class AppState extends ChangeNotifier {
         updated.phase == SessionPhase.insideClub) {
       _startTimer();
       _startQrRefresh(QrPurpose.exit);
+      _scheduleAutoBadgeOut(updated);
+    }
+
+    if (updated.phase == SessionPhase.insideClub ||
+        updated.phase == SessionPhase.awaitingExitScan) {
+      _scheduleAutoBadgeOut(updated);
+    } else {
+      _autoBadgeOutTimer?.cancel();
     }
 
     notifyListeners();
@@ -333,7 +541,9 @@ class AppState extends ChangeNotifier {
       branch: session.branch,
       phase: SessionPhase.completed,
       remainingSeconds: timeBalance,
-      drinksOrdered: session.drinksOrdered > 0 ? session.drinksOrdered : _drinksOrdered,
+      drinksOrdered: session.drinksOrdered > 0
+          ? session.drinksOrdered
+          : _drinksOrdered,
       enteredAt: session.enteredAt != null
           ? ClubSessionRecord.correctToLocal(session.enteredAt!)
           : null,
@@ -342,6 +552,9 @@ class AppState extends ChangeNotifier {
     );
     _session = _checkoutReceipt;
     _currentQr = null;
+    _autoBadgeOutTimer?.cancel();
+    _resetTimeLowWarnings();
+    _lastAnnouncedBand = null;
     unawaited(_clearSocialPresence());
     unawaited(_persistCheckoutReceipt());
     unawaited(_sounds.playCheckoutChime());
@@ -402,8 +615,9 @@ class AppState extends ChangeNotifier {
         try {
           final fresh = await _sessionStore.fetchSessionFresh(session.id);
           if (fresh?.enteredAt != null) {
-            _checkoutReceipt!.enteredAt =
-                ClubSessionRecord.correctToLocal(fresh!.enteredAt!);
+            _checkoutReceipt!.enteredAt = ClubSessionRecord.correctToLocal(
+              fresh!.enteredAt!,
+            );
           }
           // Keep device exit stamp unless DB exit is plausibly the same night.
           if (fresh?.exitedAt != null) {
@@ -438,24 +652,80 @@ class AppState extends ChangeNotifier {
     if (_session?.phase == SessionPhase.insideClub && timeBalance > 0) {
       _startTimer();
     }
+    _scheduleAutoBadgeOut(_session);
+    startSocialInboxPolling();
     notifyListeners();
   }
 
-  Future<MemberUser> signUp({
+  void _scheduleAutoBadgeOut(ClubSessionRecord? session) {
+    _autoBadgeOutTimer?.cancel();
+    if (session == null || _checkoutReceipt != null) return;
+    final autoExitAt = session.autoBadgeOutAt;
+    if (autoExitAt == null) return;
+    if (session.phase != SessionPhase.insideClub &&
+        session.phase != SessionPhase.awaitingExitScan) {
+      return;
+    }
+
+    final delay = autoExitAt.difference(DateTime.now());
+    if (!delay.isNegative) {
+      _autoBadgeOutTimer = Timer(delay, () {
+        unawaited(_completeAutoBadgeOutIfNeeded());
+      });
+      return;
+    }
+
+    unawaited(_completeAutoBadgeOutIfNeeded());
+  }
+
+  Future<void> _completeAutoBadgeOutIfNeeded() async {
+    final session = _session;
+    if (session == null || _checkoutReceipt != null) return;
+    if (!session.isAutoBadgeOutOverdue()) return;
+
+    try {
+      await _sessionStore.completeStaleSessions(memberId: _user?.id);
+      final fresh = await _sessionStore.fetchSessionFresh(session.id);
+      if (fresh == null || fresh.phase != SessionPhase.completed) return;
+
+      _timer?.cancel();
+      _qrRefreshTimer?.cancel();
+      _syncTimer?.cancel();
+      _autoBadgeOutTimer?.cancel();
+      _captureCheckoutReceipt(fresh);
+      notifyListeners();
+      unawaited(_finalizeCheckoutReceipt(fresh));
+    } catch (_) {
+      _autoBadgeOutTimer?.cancel();
+      _autoBadgeOutTimer = Timer(const Duration(minutes: 5), () {
+        unawaited(_completeAutoBadgeOutIfNeeded());
+      });
+    }
+  }
+
+  Future<SignUpResult> signUp({
     required String name,
     required String email,
     required String password,
     required DateTime birthdate,
   }) async {
-    _user = await _auth.signUp(
+    final result = await _auth.signUp(
       name: name,
       email: email,
       password: password,
       birthdate: birthdate,
     );
-    notifyListeners();
-    return _user!;
+    if (result.user != null) {
+      _user = result.user;
+      _needsMemberTutorial = true;
+      _startCurrencyRealtime();
+      notifyListeners();
+    }
+    return result;
   }
+
+  Future<void> resendSignupConfirmation(String email) =>
+      _auth.resendSignupConfirmation(email);
 
   Future<MemberUser> login({
     required String email,
@@ -475,7 +745,10 @@ class AppState extends ChangeNotifier {
       _user = await _auth.refreshProfile() ?? _user;
     }
 
+    await _refreshTutorialFlag();
     _startCurrencyRealtime();
+    startSocialInboxPolling();
+    unawaited(_registerPushTokens());
 
     notifyListeners();
     return _user!;
@@ -487,6 +760,20 @@ class AppState extends ChangeNotifier {
     _auth.startProfileCurrencyWatch((user) {
       unawaited(_onRemoteProfileCurrency(user));
     });
+  }
+
+  /// Pull latest wallet from Supabase (desk loads). Safe to call on a timer.
+  Future<void> refreshWalletFromCloud() async {
+    if (!usesCloud || _user == null) return;
+    try {
+      final fresh = await _auth.refreshProfile();
+      if (fresh == null) return;
+      final prev = _user!.timeBalanceSeconds;
+      if (fresh.timeBalanceSeconds == prev) return;
+      await _onRemoteProfileCurrency(fresh);
+    } catch (_) {
+      // Keep last known balance — next poll / realtime may succeed.
+    }
   }
 
   /// Live desk / admin credits — celebrate meaningful increases from the cloud.
@@ -526,6 +813,7 @@ class AppState extends ChangeNotifier {
     if (delta > 3) {
       _resumeTimerIfNeeded();
       _syncLiveActivity(force: true);
+      _maybeWarnTimerLow();
     }
 
     notifyListeners();
@@ -554,12 +842,15 @@ class AppState extends ChangeNotifier {
 
   Future<void> logout() async {
     _stopCurrencyRealtime();
+    stopSocialInboxPolling();
+    _clearSocialAlertQueues();
     await _flushWalletTimerSync();
     _timer?.cancel();
     _qrRefreshTimer?.cancel();
     _syncTimer?.cancel();
     _sessionStore.unsubscribe();
     await _clearSocialPresence();
+    await _safety.clearPushTokens();
     await _auth.logout();
     _user = null;
     _session = null;
@@ -567,6 +858,9 @@ class AppState extends ChangeNotifier {
     _currentQr = null;
     _drinksOrdered = 0;
     _loungeInitialized = false;
+    _liveSocialTitle = null;
+    _liveSocialBody = null;
+    _liveSocialSender = null;
     unawaited(_liveActivity.end());
     notifyListeners();
   }
@@ -645,7 +939,28 @@ class AppState extends ChangeNotifier {
     if (!chal.isComplete || chal.claimed) return;
     _challenges[i] = chal.copyWith(claimed: true);
     _addPoints(chal.points);
+    if (chal.bonusMinutes > 0) {
+      unawaited(_creditBonusMinutes(chal.bonusMinutes, source: chal.title));
+    }
     notifyListeners();
+  }
+
+  Future<void> _creditBonusMinutes(int minutes, {String? source}) async {
+    if (minutes < 1 || _user == null) return;
+    try {
+      _user = await _withLocalTimeMutation(
+        () => _auth.addTimeBalance(minutes * 60),
+      );
+    } catch (_) {
+      return;
+    }
+    if (_session != null) {
+      _session!.bonusMinutesEarned += minutes;
+      unawaited(_sessionStore.upsert(_session!));
+    }
+    _addFeedEvent(
+      'earned +$minutes min${source != null ? ' · $source' : ''}',
+    );
   }
 
   void completeMiniGame(MiniGame game, int points) {
@@ -653,6 +968,7 @@ class AppState extends ChangeNotifier {
     _addPoints(points);
     if (game.id == 'game-1' || game.id == 'game-3') {
       _progressChallenge('chal-3', by: 1);
+      unawaited(_creditBonusMinutes(30, source: 'Win Club Games'));
     }
     notifyListeners();
   }
@@ -698,22 +1014,23 @@ class AppState extends ChangeNotifier {
   void _recalculateLeaderboardRanks() {
     if (_leaderboard.isEmpty) return;
 
-    final updated = _leaderboard
-        .map((u) {
-          final seconds = u.isCurrentUser ? spendableTimeSeconds : (u.timeBalance ?? 0);
-          return LeaderboardUser(
-            rank: u.rank,
-            name: u.isCurrentUser ? (_user?.name ?? u.name) : u.name,
-            points: u.isCurrentUser ? _points : u.points,
-            tier: _tierForSeconds(seconds),
-            isCurrentUser: u.isCurrentUser,
-            avatarColor: u.avatarColor,
-            avatarGlyph: u.avatarGlyph,
-            timeBalance: seconds,
-          );
-        })
-        .toList()
-      ..sort((a, b) => (b.timeBalance ?? 0).compareTo(a.timeBalance ?? 0));
+    final updated =
+        _leaderboard.map((u) {
+            final seconds = u.isCurrentUser
+                ? spendableTimeSeconds
+                : (u.timeBalance ?? 0);
+            return LeaderboardUser(
+              rank: u.rank,
+              name: u.isCurrentUser ? (_user?.name ?? u.name) : u.name,
+              points: u.isCurrentUser ? _points : u.points,
+              tier: _tierForSeconds(seconds),
+              isCurrentUser: u.isCurrentUser,
+              avatarColor: u.avatarColor,
+              avatarGlyph: u.avatarGlyph,
+              timeBalance: seconds,
+            );
+          }).toList()
+          ..sort((a, b) => (b.timeBalance ?? 0).compareTo(a.timeBalance ?? 0));
 
     _leaderboard = [
       for (var i = 0; i < updated.length; i++)
@@ -759,13 +1076,16 @@ class AppState extends ChangeNotifier {
     _currentQr = null;
     _drinksOrdered = 0;
     _loungeInitialized = false;
-    _timerLowSoundPlayed = false;
+    _resetTimeLowWarnings();
+    _lastAnnouncedBand = null;
     unawaited(_liveActivity.end());
     notifyListeners();
   }
 
   Future<void> cancelPendingPass() async {
-    if (_session == null || _session!.phase != SessionPhase.paidAwaitingEntry) return;
+    if (_session == null || _session!.phase != SessionPhase.paidAwaitingEntry) {
+      return;
+    }
 
     final refundSeconds = _session!.purchasedSeconds;
 
@@ -821,7 +1141,9 @@ class AppState extends ChangeNotifier {
     if (_user == null || !_user!.isMember) return PaymentResult.failed;
 
     if (_session == null) {
-      final existing = await _sessionStore.fetchActiveSessionForMember(_user!.id);
+      final existing = await _sessionStore.fetchActiveSessionForMember(
+        _user!.id,
+      );
       if (existing != null) {
         await _applyRestoredSession(existing);
       }
@@ -868,6 +1190,7 @@ class AppState extends ChangeNotifier {
       await _sessionStore.subscribeToSession(sessionId);
       _startQrRefresh(QrPurpose.entry);
       _startSyncPolling();
+      await _maybeSkipEntryDoorScan();
     }
 
     notifyListeners();
@@ -894,11 +1217,15 @@ class AppState extends ChangeNotifier {
       branch: _selectedBranch,
       phase: SessionPhase.paidAwaitingEntry,
       remainingSeconds: 0,
+      packageSlug: _user!.activePackageSlug,
+      includedDrinksRemaining: _user!.includedDrinksRemaining,
+      includedDrinksTotal: _user!.includedDrinksTotal,
     );
     await _sessionStore.upsert(_session!);
     await _sessionStore.subscribeToSession(sessionId);
     _startQrRefresh(QrPurpose.entry);
     _startSyncPolling();
+    await _maybeSkipEntryDoorScan();
     notifyListeners();
     return true;
   }
@@ -918,6 +1245,7 @@ class AppState extends ChangeNotifier {
       if (_session!.phase == SessionPhase.insideClub) {
         _resumeTimerIfNeeded();
       }
+      _maybeWarnTimerLow();
     }
 
     notifyListeners();
@@ -954,12 +1282,14 @@ class AppState extends ChangeNotifier {
 
     final seconds = minutes * 60;
     _user = await _withLocalTimeMutation(() => _auth.addTimeBalance(seconds));
+    _maybeWarnTimerLow();
 
     notifyListeners();
     return result;
   }
 
-  Future<PaymentResult> purchaseAndLoadTime(int minutes) => purchaseTime(minutes);
+  Future<PaymentResult> purchaseAndLoadTime(int minutes) =>
+      purchaseTime(minutes);
 
   void _resumeTimerIfNeeded() {
     if (_session?.phase == SessionPhase.insideClub && timeBalance > 0) {
@@ -984,7 +1314,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> cancelExitRequest() async {
-    if (_session == null || _session!.phase != SessionPhase.awaitingExitScan) return;
+    if (_session == null || _session!.phase != SessionPhase.awaitingExitScan) {
+      return;
+    }
 
     await _sessionStore.cancelExitRequest(_session!.id);
     final updated = await _sessionStore.fetchSession(_session!.id);
@@ -1062,6 +1394,67 @@ class AppState extends ChangeNotifier {
     return 'Guest is not at entry or exit gate.';
   }
 
+  /// Auto-badge-in for allowlisted / VIP members — no staff door QR needed.
+  Future<bool> _maybeSkipEntryDoorScan() async {
+    if (!canSkipDoorQr) return false;
+    if (_session?.phase != SessionPhase.paidAwaitingEntry) return false;
+    return debugBypassDoorScan();
+  }
+
+  /// Hidden pilot/debug: triple-tap the door icon to skip staff QR scan.
+  ///
+  /// Applies lounge/exit locally because [ClubSessionRecord] is shared mutable
+  /// with the session store — a same-device confirmEntry wouldn't fire the
+  /// usual previous→next phase transition in [_onSessionStoreChanged].
+  Future<bool> debugBypassDoorScan() async {
+    final session = _session;
+    if (session == null || _checkoutReceipt != null) return false;
+
+    if (session.phase == SessionPhase.paidAwaitingEntry) {
+      try {
+        await _sessionStore.confirmEntry(session.id);
+      } catch (_) {
+        // Still enter locally so 2-phone friendship testing can continue.
+      }
+      session.phase = SessionPhase.insideClub;
+      session.enteredAt ??= DateTime.now();
+      _session = session;
+      _timer?.cancel();
+      _syncTimer?.cancel();
+      _initLoungeState();
+      _startQrRefresh(QrPurpose.exit);
+      _scheduleAutoBadgeOut(session);
+      unawaited(_sounds.playDoorLatch());
+      await _onEnteredClub();
+      notifyListeners();
+      _syncLiveActivity(force: true);
+      return true;
+    }
+
+    if (session.phase == SessionPhase.insideClub ||
+        session.phase == SessionPhase.awaitingExitScan) {
+      try {
+        if (session.phase == SessionPhase.insideClub) {
+          await _sessionStore.requestExit(session.id);
+        }
+        await _sessionStore.confirmExit(session.id);
+      } catch (_) {
+        // Fall through to local checkout.
+      }
+      _timer?.cancel();
+      _qrRefreshTimer?.cancel();
+      _syncTimer?.cancel();
+      session.phase = SessionPhase.completed;
+      session.exitedAt ??= DateTime.now();
+      _captureCheckoutReceipt(session);
+      notifyListeners();
+      unawaited(_finalizeCheckoutReceipt(session));
+      return true;
+    }
+
+    return false;
+  }
+
   Future<void> _bankTimeForCompletedVisit(
     SessionPhase previousPhase,
     ClubSessionRecord session,
@@ -1076,16 +1469,47 @@ class AppState extends ChangeNotifier {
 
   Future<void> _flushWalletTimerSync() async {
     if (_user == null || _timerSyncDebt <= 0) return;
+    final debt = _timerSyncDebt;
     _timerSyncDebt = 0;
     try {
-      _user = await _auth.setTimeBalance(timeBalance);
+      // Relative subtract — never absolute overwrite (won't undo RPC spends).
+      _user = await _auth.applyTimerDebt(debt);
     } catch (_) {
-      // Best effort — realtime profile watch will reconcile.
+      _timerSyncDebt += debt;
+    }
+  }
+
+  /// Serialize wallet spends: pause meter → flush debt → mutate → resume.
+  Future<T?> _runExclusiveWallet<T>(
+    Future<T> Function() action, {
+    T? onBusy,
+  }) async {
+    if (_walletBusy) return onBusy;
+    _walletBusy = true;
+    final shouldResume = _session?.phase == SessionPhase.insideClub ||
+        _session?.phase == SessionPhase.awaitingExitScan;
+    _timer?.cancel();
+    try {
+      await _flushWalletTimerSync();
+      return await _withLocalTimeMutation(action);
+    } finally {
+      _walletBusy = false;
+      if (shouldResume && timeBalance > 0) {
+        _startTimer();
+      }
+      _maybeWarnTimerLow();
+      _syncLiveActivity(force: true);
+      notifyListeners();
     }
   }
 
   void _startTimer() {
     _timer?.cancel();
+    // Seed once per visit so restore/resume doesn't dump every mark already below.
+    if (!_timeLowThresholdsSeeded) {
+      _seedTimeLowThresholdsAlreadyPast();
+      _timeLowThresholdsSeeded = true;
+    }
     _syncLiveActivity(force: true);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       if (_session == null) return;
@@ -1107,6 +1531,9 @@ class AppState extends ChangeNotifier {
       _user = _user!.copyWith(timeBalanceSeconds: timeBalance - 1);
       _timerSyncDebt++;
       _maybeWarnTimerLow();
+      // Throttled: live timerInterval needs rare re-anchors; static mega-wallet
+      // labels refresh about once a minute while foregrounded.
+      _syncLiveActivity();
 
       if (_timerSyncDebt >= 5) {
         await _flushWalletTimerSync();
@@ -1119,26 +1546,150 @@ class AppState extends ChangeNotifier {
   }
 
   void _maybeWarnTimerLow() {
+    _maybeAnnounceTimerBand();
     final phase = _session?.phase;
     if (phase != SessionPhase.insideClub &&
         phase != SessionPhase.awaitingExitScan) {
       return;
     }
-    if (timeBalance > 0 && timeBalance <= 10 * 60) {
-      if (!_timerLowSoundPlayed) {
-        _timerLowSoundPlayed = true;
-        unawaited(_sounds.playTimerLow());
-        _syncLiveActivity(force: true);
+
+    final seconds = timeBalance;
+    if (seconds <= 0) return;
+
+    // Climbing back above a mark (buy / gift) re-arms that threshold.
+    for (final minutes in TimeLowAlert.thresholds) {
+      if (seconds > minutes * 60) {
+        _firedTimeLowThresholds.remove(minutes);
+        _pushedAlertIds.remove('time-low-$minutes');
+        _timeLowAlertQueue
+            .removeWhere((a) => a.minutesThreshold == minutes);
       }
-    } else if (timeBalance > 10 * 60) {
-      _timerLowSoundPlayed = false;
+    }
+
+    // Crossing into marks: fire the most urgent newly crossed only (avoid banner
+    // spam when a big spend drops past several thresholds at once).
+    TimeLowAlert? mostUrgent;
+    for (final minutes in TimeLowAlert.thresholds) {
+      if (seconds > minutes * 60) continue;
+      if (_firedTimeLowThresholds.contains(minutes)) continue;
+      _firedTimeLowThresholds.add(minutes);
+      final alert = TimeLowAlert(minutesThreshold: minutes);
+      if (mostUrgent == null ||
+          alert.minutesThreshold < mostUrgent.minutesThreshold) {
+        mostUrgent = alert;
+      }
+    }
+    if (mostUrgent != null) {
+      _enqueueTimeLowAlert(mostUrgent);
+    }
+  }
+
+  /// Don't replay thresholds already below when the timer first starts this visit.
+  void _seedTimeLowThresholdsAlreadyPast() {
+    final seconds = timeBalance;
+    if (seconds <= 0) return;
+    for (final minutes in TimeLowAlert.thresholds) {
+      // Strict < so an exact mark (e.g. 30:00) can still fire once.
+      if (seconds < minutes * 60) {
+        _firedTimeLowThresholds.add(minutes);
+      }
+    }
+  }
+
+  void _resetTimeLowWarnings() {
+    _firedTimeLowThresholds.clear();
+    _timeLowAlertQueue.clear();
+    _timeLowThresholdsSeeded = false;
+    for (final minutes in TimeLowAlert.thresholds) {
+      _pushedAlertIds.remove('time-low-$minutes');
+    }
+  }
+
+  bool _enqueueTimeLowAlert(TimeLowAlert alert) {
+    if (_timeLowAlertQueue
+        .any((a) => a.minutesThreshold == alert.minutesThreshold)) {
+      return false;
+    }
+    final becameHead = _timeLowAlertQueue.isEmpty;
+    if (becameHead) {
+      _timeLowAlertQueue.add(alert);
+    } else {
+      // Keep current head; sort the tail so more urgent (lower minutes) comes next.
+      final head = _timeLowAlertQueue.first;
+      final rest = _timeLowAlertQueue.sublist(1)..add(alert);
+      rest.sort((a, b) => a.minutesThreshold.compareTo(b.minutesThreshold));
+      _timeLowAlertQueue
+        ..clear()
+        ..add(head)
+        ..addAll(rest);
+    }
+    if (becameHead) _surfaceTimeLowHead(alert);
+    notifyListeners();
+    return true;
+  }
+
+  void _surfaceTimeLowHead(TimeLowAlert alert) {
+    if (_appInForeground && alert.isUrgent) {
+      unawaited(_sounds.playTimerLow());
+    }
+    if (_pushedAlertIds.contains(alert.id)) return;
+    _pushedAlertIds.add(alert.id);
+    if (_pushedAlertIds.length > 400) {
+      _pushedAlertIds.clear();
+      _pushedAlertIds.add(alert.id);
+    }
+
+    if (!_appInForeground) {
+      // Background: local banner + Live Activity system alert (no APNs job).
+      unawaited(
+        _push.showSocialAlert(
+          id: alert.id,
+          title: alert.title,
+          body: alert.body,
+        ),
+      );
+      _liveSocialTitle = alert.title;
+      _liveSocialBody = alert.body;
+      _liveSocialSender = null;
+      _syncLiveActivity(force: true, withSystemAlert: true);
+      return;
+    }
+
+    // Foreground: island banner owns UX; keep Live Activity in sync quietly.
+    _syncLiveActivity(force: true);
+  }
+
+  void clearPendingTimeLowAlert() {
+    if (_timeLowAlertQueue.isEmpty) return;
+    _timeLowAlertQueue.removeAt(0);
+    _clearLiveSocialAlert();
+    _promoteNextAlertSurface();
+    notifyListeners();
+  }
+
+  void _promoteNextAlertSurface() {
+    // Prefer social Live Activity resurfacing; island host still shows time after.
+    final request = pendingRequestAlert;
+    if (request != null) {
+      _surfaceRequestHead(request);
+      return;
+    }
+    final ping = pendingPingAlert;
+    if (ping != null) {
+      _surfacePingHead(ping);
+      return;
+    }
+    final time = pendingTimeLowAlert;
+    if (time != null) {
+      _surfaceTimeLowHead(time);
     }
   }
 
   /// Push time-as-currency into Dynamic Island / Lock Screen / Apple Watch.
-  void _syncLiveActivity({bool force = false}) {
+  void _syncLiveActivity({bool force = false, bool withSystemAlert = false}) {
     final phase = sessionPhase;
-    final inside = phase == SessionPhase.insideClub ||
+    final inside =
+        phase == SessionPhase.insideClub ||
         phase == SessionPhase.awaitingExitScan;
     if (!inside || _checkoutReceipt != null) {
       unawaited(_liveActivity.end());
@@ -1148,8 +1699,12 @@ class AppState extends ChangeNotifier {
 
     final seconds = timeBalance;
     final useLiveCountdown =
-        seconds > 0 && seconds <= TimeLiveActivityService.liveCountdownMaxSeconds;
-    if (!force && _lastLiveActivitySeconds != null) {
+        seconds > 0 &&
+        seconds <= TimeLiveActivityService.liveCountdownMaxSeconds;
+    if (!force &&
+        !withSystemAlert &&
+        _liveSocialTitle == null &&
+        _lastLiveActivitySeconds != null) {
       final delta = (seconds - _lastLiveActivitySeconds!).abs();
       // Native countdown needs rare updates; big wallet labels refresh ~each minute.
       if (useLiveCountdown && delta < 4) return;
@@ -1157,9 +1712,10 @@ class AppState extends ChangeNotifier {
     }
     _lastLiveActivitySeconds = seconds;
 
-    final status = phase == SessionPhase.awaitingExitScan
+    final baseStatus = phase == SessionPhase.awaitingExitScan
         ? 'AWAITING EXIT'
         : (seconds <= 10 * 60 ? 'TIME RUNNING LOW' : 'INSIDE THE CLUB');
+    final status = _liveSocialTitle ?? baseStatus;
 
     unawaited(
       _liveActivity.syncVisit(
@@ -1168,8 +1724,125 @@ class AppState extends ChangeNotifier {
         branch: _session?.branch ?? _selectedBranch,
         status: status,
         remainingSeconds: seconds,
+        socialAlertTitle: _liveSocialTitle,
+        socialAlertBody: _liveSocialBody,
+        socialAlertSender: _liveSocialSender,
+        withSystemAlert: withSystemAlert,
       ),
     );
+  }
+
+  void _surfaceSocialDelivery({
+    required String id,
+    required String title,
+    required String body,
+    String? senderName,
+    bool updateLive = true,
+  }) {
+    if (_pushedAlertIds.contains(id)) return;
+    _pushedAlertIds.add(id);
+    // Bound growth — IDs are only for deduping push/live surfaces.
+    if (_pushedAlertIds.length > 400) {
+      _pushedAlertIds.clear();
+      _pushedAlertIds.add(id);
+    }
+
+    if (!_appInForeground) {
+      unawaited(
+        _push.showSocialAlert(id: id, title: title, body: body),
+      );
+    }
+
+    if (updateLive) {
+      _liveSocialTitle = title;
+      _liveSocialBody = body;
+      _liveSocialSender = senderName;
+      _syncLiveActivity(force: true, withSystemAlert: true);
+    }
+  }
+
+  void _surfacePingHead(FriendPing ping) {
+    final name = ping.senderName ?? 'Friend';
+    unawaited(_sounds.playKnock());
+    _surfaceSocialDelivery(
+      id: ping.id,
+      title: ping.isChat ? 'Message from $name' : 'Ping from $name',
+      body: ping.message,
+      senderName: name,
+      updateLive: true,
+    );
+  }
+
+  void _surfaceRequestHead(FriendRequest request) {
+    _surfaceSocialDelivery(
+      id: 'req-${request.id}',
+      title: 'Friend request',
+      body: '${request.requesterName} wants to add you.',
+      senderName: request.requesterName,
+      updateLive: true,
+    );
+  }
+
+  /// Enqueue a ping for the island banner. Keeps current head stable;
+  /// prefers status pings over chat in the waiting tail.
+  bool _enqueuePingAlert(FriendPing ping) {
+    if (_ackedPingIds.contains(ping.id)) return false;
+    if (_pingAlertQueue.any((p) => p.id == ping.id)) return false;
+
+    final becameHead = _pingAlertQueue.isEmpty;
+    if (becameHead) {
+      _pingAlertQueue.add(ping);
+    } else {
+      final head = _pingAlertQueue.first;
+      final rest = _pingAlertQueue.sublist(1)..add(ping);
+      rest.sort((a, b) {
+        if (a.isChat != b.isChat) return a.isChat ? 1 : -1;
+        final aAt = a.createdAt;
+        final bAt = b.createdAt;
+        if (aAt != null && bAt != null) return aAt.compareTo(bAt);
+        return 0;
+      });
+      _pingAlertQueue
+        ..clear()
+        ..add(head)
+        ..addAll(rest);
+    }
+
+    if (becameHead) _surfacePingHead(ping);
+    return true;
+  }
+
+  bool _enqueueRequestAlert(FriendRequest request) {
+    if (_seenInboundRequestIds.contains(request.id)) return false;
+    if (_requestAlertQueue.any((r) => r.id == request.id)) return false;
+
+    final becameHead = _requestAlertQueue.isEmpty;
+    _requestAlertQueue.add(request);
+    if (becameHead) _surfaceRequestHead(request);
+    return true;
+  }
+
+  void _clearSocialAlertQueues() {
+    _pingAlertQueue.clear();
+    _requestAlertQueue.clear();
+    _incomingPings = [];
+    _seenInboundRequestIds.clear();
+    _ackedPingIds.clear();
+    _pushedAlertIds.clear();
+    _resetTimeLowWarnings();
+    _clearLiveSocialAlert();
+  }
+
+  void _clearLiveSocialAlert() {
+    if (_liveSocialTitle == null &&
+        _liveSocialBody == null &&
+        _liveSocialSender == null) {
+      return;
+    }
+    _liveSocialTitle = null;
+    _liveSocialBody = null;
+    _liveSocialSender = null;
+    _syncLiveActivity(force: true);
   }
 
   void _startQrRefresh(QrPurpose purpose) {
@@ -1209,36 +1882,125 @@ class AppState extends ChangeNotifier {
     return '${m}m ${s.toString().padLeft(2, '0')}s';
   }
 
-  Future<bool> orderDrink(Drink drink) async {
-    if (!canSpendTime) return false;
-    if (timeBalance < drink.timeCostSeconds) {
+  Future<bool> orderDrink(Drink drink, {bool payWithCash = false}) async {
+    if (!isInsideClub) return false;
+    if (_walletBusy) return false;
+
+    final result = await _runExclusiveWallet<bool>(() async {
+      if (drink.isStandard) {
+        if (drinksAllowanceRemaining < 1) {
+          unawaited(_sounds.playSoftThud());
+          return false;
+        }
+        try {
+          if (usesCloud) {
+            _user = await _auth.consumeIncludedDrink(sessionId: _session?.id);
+            if (_session != null) {
+              _session!.includedDrinksRemaining =
+                  _user?.includedDrinksRemaining ?? 0;
+            }
+          } else {
+            final next = (drinksAllowanceRemaining - 1).clamp(0, 1 << 31);
+            if (_session != null) {
+              _session!.includedDrinksRemaining = next;
+            }
+            if (_user != null) {
+              _user = _user!.copyWith(includedDrinksRemaining: next);
+              await _auth.persistLocalUser(_user!);
+            }
+          }
+        } catch (_) {
+          unawaited(_sounds.playSoftThud());
+          return false;
+        }
+      } else if (payWithCash) {
+        // Premium paid at bar — track order only, no minute burn.
+      } else {
+        if (timeBalance < drink.timeCostSeconds) {
+          unawaited(_sounds.playSoftThud());
+          return false;
+        }
+        try {
+          _user = await _auth.deductTimeBalance(drink.timeCostSeconds);
+        } catch (_) {
+          unawaited(_sounds.playSoftThud());
+          return false;
+        }
+      }
+
+      _drinksOrdered++;
+      if (_session != null) {
+        _session!.drinksOrdered = _drinksOrdered;
+        await _sessionStore.upsert(_session!);
+      }
+      unawaited(_sounds.playGlassClink());
+      _progressChallenge('chal-2', by: 1);
+      _addPoints(10);
+      _addFeedEvent("just ordered a ${drink.name} at the Main Bar!");
+      return true;
+    }, onBusy: false);
+
+    return result ?? false;
+  }
+
+  int get drinksAllowanceRemaining {
+    if (_session != null) return _session!.includedDrinksRemaining;
+    return _user?.includedDrinksRemaining ?? 0;
+  }
+
+  /// Spend minutes on a venue experience (VIP Lounge, VVIP Room, etc.).
+  Future<bool> redeemVenueActivity(VenueActivity activity) async {
+    if (!canSpendTime || _session == null) return false;
+    if (_walletBusy) return false;
+
+    final costSeconds = activity.timeCostMinutes * 60;
+    if (timeBalance < costSeconds) {
       unawaited(_sounds.playSoftThud());
       return false;
     }
 
-    _timer?.cancel();
-    try {
-      _user = await _auth.deductTimeBalance(drink.timeCostSeconds);
-    } catch (_) {
-      unawaited(_sounds.playSoftThud());
-      return false;
-    }
-
-    _drinksOrdered++;
-    if (_session != null) {
-      _session!.drinksOrdered = _drinksOrdered;
+    final result = await _runExclusiveWallet<bool>(() async {
+      if (timeBalance < costSeconds) {
+        unawaited(_sounds.playSoftThud());
+        return false;
+      }
+      try {
+        _user = await _auth.redeemVenueActivity(
+          activitySlug: activity.slug,
+          minutes: activity.timeCostMinutes,
+          sessionId: _session!.id,
+        );
+      } catch (_) {
+        unawaited(_sounds.playSoftThud());
+        return false;
+      }
+      _session!.experiencesMinutesSpent += activity.timeCostMinutes;
       await _sessionStore.upsert(_session!);
+      _addFeedEvent(
+        'unlocked ${activity.name} (−${activity.timeCostMinutes} min)',
+      );
+      return true;
+    }, onBusy: false);
+
+    return result ?? false;
+  }
+
+  TimerBand get currentTimerBand =>
+      AppColors.timerBand(timeBalance ~/ 60);
+
+  void _maybeAnnounceTimerBand() {
+    if (sessionPhase != SessionPhase.insideClub &&
+        sessionPhase != SessionPhase.awaitingExitScan) {
+      return;
     }
-    unawaited(_sounds.playGlassClink());
-    _syncLiveActivity(force: true);
-    if (_session?.phase == SessionPhase.insideClub && timeBalance > 0) {
-      _startTimer();
-    }
-    _progressChallenge('chal-2', by: 1);
-    _addPoints(10);
-    _addFeedEvent("just ordered a ${drink.name} at the Main Bar!");
-    notifyListeners();
-    return true;
+    final band = currentTimerBand;
+    final key = band.name;
+    if (_lastAnnouncedBand == key) return;
+    final previous = _lastAnnouncedBand;
+    _lastAnnouncedBand = key;
+    if (previous == null) return;
+    // Soft notice on band change only (battery psychology).
+    _addFeedEvent(band.guestHint);
   }
 
   String _formatMinutes(int seconds) {
@@ -1255,22 +2017,30 @@ class AppState extends ChangeNotifier {
     if (timeBalance < seconds) {
       return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
     }
+    if (_walletBusy) {
+      return (null, 'Hang on — another spend is still processing.');
+    }
 
     try {
-      final gift = await _gifts.raiseToast(seconds: seconds, message: message);
-      if (usesCloud) {
-        _user = await _auth.refreshProfile() ?? _user;
-      } else {
-        _user = await _auth.deductTimeBalance(seconds);
-      }
-      _addFeedEvent(
-        'raised a ${minutes}m toast${gift.code != null ? ' — find me for ${gift.code}' : ''}',
-      );
-      _addPoints(5);
-      unawaited(_sounds.playGlassClink());
-      _syncLiveActivity(force: true);
-      notifyListeners();
-      return (gift, null);
+      final outcome = await _runExclusiveWallet<(TimeGift?, String?)>(() async {
+        if (timeBalance < seconds) {
+          return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
+        }
+        final gift =
+            await _gifts.raiseToast(seconds: seconds, message: message);
+        if (usesCloud) {
+          _user = await _auth.refreshProfile() ?? _user;
+        } else {
+          _user = await _auth.deductTimeBalance(seconds);
+        }
+        _addFeedEvent(
+          'raised a ${minutes}m toast${gift.code != null ? ' — find me for ${gift.code}' : ''}',
+        );
+        _addPoints(5);
+        unawaited(_sounds.playGlassClink());
+        return (gift, null);
+      }, onBusy: (null, 'Hang on — another spend is still processing.'));
+      return outcome ?? (null, 'Could not raise toast.');
     } on TimeGiftException catch (e) {
       return (null, e.message);
     } catch (_) {
@@ -1287,21 +2057,29 @@ class AppState extends ChangeNotifier {
     if (timeBalance < seconds) {
       return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
     }
+    if (_walletBusy) {
+      return (null, 'Hang on — another spend is still processing.');
+    }
 
     try {
-      final gift = await _gifts.tipHouse(seconds: seconds, message: message);
-      if (usesCloud) {
-        _user = await _auth.refreshProfile() ?? _user;
-      } else {
-        _user = await _auth.deductTimeBalance(seconds);
-      }
-      _addFeedEvent('tipped the house ${_formatMinutes(seconds)} — class act');
-      _addPoints(8);
-      _progressChallenge('chal-6', by: 1);
-      unawaited(_sounds.playGlassClink());
-      _syncLiveActivity(force: true);
-      notifyListeners();
-      return (gift, null);
+      final outcome = await _runExclusiveWallet<(TimeGift?, String?)>(() async {
+        if (timeBalance < seconds) {
+          return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
+        }
+        final gift =
+            await _gifts.tipHouse(seconds: seconds, message: message);
+        if (usesCloud) {
+          _user = await _auth.refreshProfile() ?? _user;
+        } else {
+          _user = await _auth.deductTimeBalance(seconds);
+        }
+        _addFeedEvent('tipped the house ${_formatMinutes(seconds)} — class act');
+        _addPoints(8);
+        _progressChallenge('chal-6', by: 1);
+        unawaited(_sounds.playGlassClink());
+        return (gift, null);
+      }, onBusy: (null, 'Hang on — another spend is still processing.'));
+      return outcome ?? (null, 'Could not send tip.');
     } on TimeGiftException catch (e) {
       return (null, e.message);
     } catch (_) {
@@ -1320,26 +2098,33 @@ class AppState extends ChangeNotifier {
     if (timeBalance < seconds) {
       return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
     }
+    if (_walletBusy) {
+      return (null, 'Hang on — another spend is still processing.');
+    }
 
     try {
-      final gift = await _gifts.tipBartender(
-        staffId: staffId,
-        seconds: seconds,
-        message: message,
-      );
-      if (usesCloud) {
-        _user = await _auth.refreshProfile() ?? _user;
-      } else {
-        _user = await _auth.deductTimeBalance(seconds);
-      }
-      _addFeedEvent(
-        'tapped $staffName tip pad — ${_formatMinutes(seconds)} poured',
-      );
-      _addPoints(10);
-      unawaited(_sounds.playGlassClink());
-      _syncLiveActivity(force: true);
-      notifyListeners();
-      return (gift, null);
+      final outcome = await _runExclusiveWallet<(TimeGift?, String?)>(() async {
+        if (timeBalance < seconds) {
+          return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
+        }
+        final gift = await _gifts.tipBartender(
+          staffId: staffId,
+          seconds: seconds,
+          message: message,
+        );
+        if (usesCloud) {
+          _user = await _auth.refreshProfile() ?? _user;
+        } else {
+          _user = await _auth.deductTimeBalance(seconds);
+        }
+        _addFeedEvent(
+          'tapped $staffName tip pad — ${_formatMinutes(seconds)} poured',
+        );
+        _addPoints(10);
+        unawaited(_sounds.playGlassClink());
+        return (gift, null);
+      }, onBusy: (null, 'Hang on — another spend is still processing.'));
+      return outcome ?? (null, 'Could not tip bartender.');
     } on TimeGiftException catch (e) {
       return (null, e.message);
     } catch (_) {
@@ -1393,9 +2178,10 @@ class AppState extends ChangeNotifier {
     if (tip.transferId != null && tip.transferId == _lastHandledTipId) return;
     if (_lastHandledTipAt != null &&
         now.difference(_lastHandledTipAt!) < const Duration(seconds: 3) &&
-        tip.tipSeconds == (_staffTipWatchBalance < tip.toBalance
-            ? tip.toBalance - _staffTipWatchBalance
-            : tip.tipSeconds)) {
+        tip.tipSeconds ==
+            (_staffTipWatchBalance < tip.toBalance
+                ? tip.toBalance - _staffTipWatchBalance
+                : tip.tipSeconds)) {
       return;
     }
 
@@ -1480,12 +2266,401 @@ class AppState extends ChangeNotifier {
   Future<void> refreshWhosInside() async {
     final branch = _session?.branch ?? _selectedBranch;
     try {
-      _whosInside = await _social.listWhosInside(
+      if (_openToMeet && !canSpendTime) {
+        await _social.clearPresence();
+        _openToMeet = false;
+        _whosInside = [];
+        notifyListeners();
+        return;
+      }
+
+      if (_openToMeet && _user != null && canSpendTime) {
+        await _social.setOpenToMeet(
+          open: true,
+          branch: branch,
+          displayName: _user!.name,
+          memberId: _user!.id,
+          sessionId: _session?.id,
+          vibeTag: _vibeTag,
+        );
+      }
+
+      final list = await _social.listWhosInside(
         branch: branch,
         selfId: _user?.id,
       );
+      _whosInside = list
+          .where((p) => !_blockedMemberIds.contains(p.memberId))
+          .toList();
       notifyListeners();
     } catch (_) {}
+  }
+
+  Future<String?> searchFriendCandidates(String query) async {
+    final user = _user;
+    if (user == null) return 'Not signed in.';
+    try {
+      _friendSearchResults = await _safety.searchMembers(
+        query: query,
+        selfId: user.id,
+      );
+      notifyListeners();
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not search members.';
+    }
+  }
+
+  Future<String?> sendFriendRequest(FriendProfile profile) async {
+    final user = _user;
+    if (user == null) return 'Not signed in.';
+    try {
+      await _safety.sendFriendRequest(
+        recipientId: profile.memberId,
+        recipientName: profile.displayName,
+        requesterId: user.id,
+        requesterName: user.name,
+      );
+      _friendSearchResults = _friendSearchResults
+          .where((p) => p.memberId != profile.memberId)
+          .toList();
+      await refreshFriendRequests();
+      notifyListeners();
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not send friend request.';
+    }
+  }
+
+  Future<void> refreshFriendRequests() async {
+    final user = _user;
+    if (user == null) return;
+    try {
+      _friendRequests = await _safety.listFriendRequests(selfId: user.id);
+      for (final request in _friendRequests) {
+        if (request.direction != 'inbound' ||
+            request.status != FriendRequestStatus.pending) {
+          continue;
+        }
+        _enqueueRequestAlert(request);
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void clearPendingRequestAlert() {
+    if (_requestAlertQueue.isEmpty) return;
+    final cleared = _requestAlertQueue.removeAt(0);
+    _seenInboundRequestIds.add(cleared.id);
+    _clearLiveSocialAlert();
+    _promoteNextAlertSurface();
+    notifyListeners();
+  }
+
+  Future<void> refreshIncomingPings() async {
+    final user = _user;
+    if (user == null) return;
+    try {
+      final list = await _safety.listFriendNotifications(
+        selfId: user.id,
+        unreadOnly: true,
+      );
+      _incomingPings = list;
+
+      for (final ping in list) {
+        _enqueuePingAlert(ping);
+      }
+
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void clearPendingPingAlert() {
+    if (_pingAlertQueue.isEmpty) return;
+    _pingAlertQueue.removeAt(0);
+    _clearLiveSocialAlert();
+    _promoteNextAlertSurface();
+    notifyListeners();
+  }
+
+  /// Mark read, dequeue the modal, and promote the next unread ping if any.
+  Future<void> acknowledgePing(FriendPing ping) async {
+    final user = _user;
+    if (user == null) return;
+
+    _ackedPingIds.add(ping.id);
+    _pingAlertQueue.removeWhere((p) => p.id == ping.id);
+    _incomingPings = _incomingPings.where((p) => p.id != ping.id).toList();
+    _clearLiveSocialAlert();
+
+    // Promote next queued ping (already ordered); else scan inbox leftovers.
+    if (_pingAlertQueue.isEmpty) {
+      for (final candidate in _incomingPings) {
+        if (_ackedPingIds.contains(candidate.id)) continue;
+        _enqueuePingAlert(candidate);
+        break;
+      }
+    } else {
+      _surfacePingHead(_pingAlertQueue.first);
+    }
+
+    notifyListeners();
+
+    try {
+      await _safety.markNotificationRead(
+        notificationId: ping.id,
+        selfId: user.id,
+      );
+    } catch (_) {}
+
+    if (_pingAlertQueue.isEmpty) {
+      await refreshIncomingPings();
+    }
+  }
+
+  Future<void> dismissPing(FriendPing ping) => acknowledgePing(ping);
+
+  Future<void> refreshSocialInbox({bool includeNearby = false}) async {
+    await Future.wait([
+      refreshFriendRequests(),
+      refreshIncomingPings(),
+      if (includeNearby) refreshMutualFriendsNearby(),
+    ]);
+  }
+
+  void startSocialInboxPolling() {
+    _socialInboxPoll?.cancel();
+    final userId = _user?.id;
+    if (userId != null) {
+      _safety.startInboxWatch(
+        selfId: userId,
+        onChanged: () {
+          // Realtime poke — pull unread immediately.
+          unawaited(refreshSocialInbox());
+        },
+      );
+    }
+    unawaited(refreshSocialInbox(includeNearby: true));
+    // Backup poll (realtime can miss events); keep this light and frequent.
+    _socialInboxPoll = Timer.periodic(const Duration(seconds: 3), (_) {
+      unawaited(refreshSocialInbox());
+    });
+  }
+
+  void stopSocialInboxPolling() {
+    _socialInboxPoll?.cancel();
+    _socialInboxPoll = null;
+    _safety.stopInboxWatch();
+  }
+
+  Future<bool> areFriendsWith(String memberId) async {
+    final user = _user;
+    if (user == null) return false;
+    try {
+      return await _safety.areFriends(otherId: memberId, selfId: user.id);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<List<FriendMessage>> loadFriendChat(String friendId) async {
+    final user = _user;
+    if (user == null) return const [];
+    try {
+      return await _safety.listFriendMessages(
+        friendId: friendId,
+        selfId: user.id,
+      );
+    } on SafetySocialException {
+      rethrow;
+    } catch (e) {
+      throw SafetySocialException('Could not load chat.');
+    }
+  }
+
+  Future<List<FriendProfile>> listMyFriends() async {
+    final user = _user;
+    if (user == null) return const [];
+    try {
+      return await _safety.listMyFriends(selfId: user.id);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<String?> sendFriendChatMessage(String friendId, String body) async {
+    final user = _user;
+    if (user == null) return 'Not signed in.';
+    try {
+      await _safety.sendFriendMessage(
+        friendId: friendId,
+        selfId: user.id,
+        body: body,
+      );
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not send message.';
+    }
+  }
+
+  Future<String?> acceptFriendRequest(FriendRequest request) async {
+    final user = _user;
+    if (user == null) return 'Not signed in.';
+    try {
+      await _safety.acceptFriendRequest(requestId: request.id, selfId: user.id);
+      await refreshFriendRequests();
+      await refreshMutualFriendsNearby();
+      notifyListeners();
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not accept friend request.';
+    }
+  }
+
+  Future<String?> declineFriendRequest(FriendRequest request) async {
+    final user = _user;
+    if (user == null) return 'Not signed in.';
+    try {
+      await _safety.declineFriendRequest(
+        requestId: request.id,
+        selfId: user.id,
+      );
+      await refreshFriendRequests();
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not decline friend request.';
+    }
+  }
+
+  Future<void> refreshMutualFriendsNearby() async {
+    final user = _user;
+    if (user == null) return;
+    final branch = _session?.branch ?? _selectedBranch;
+    try {
+      _mutualFriendsNearby = await _safety.listMutualFriendsNearby(
+        branch: branch,
+        selfId: user.id,
+      );
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<String?> notifyFriend(FriendProfile friend, String message) async {
+    final user = _user;
+    if (user == null) return 'Not signed in.';
+    try {
+      _lastFriendPing = await _safety.notifyFriend(
+        friendId: friend.memberId,
+        selfId: user.id,
+        message: message,
+      );
+      // Private — never post pings to the public lounge feed.
+      notifyListeners();
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not notify friend.';
+    }
+  }
+
+  Future<String?> blockMember(String memberId, {String? reason}) async {
+    final user = _user;
+    if (user == null) return 'Not signed in.';
+    try {
+      await _safety.blockMember(
+        blockedId: memberId,
+        selfId: user.id,
+        reason: reason,
+      );
+      _blockedMemberIds.add(memberId);
+      _whosInside = _whosInside.where((p) => p.memberId != memberId).toList();
+      _mutualFriendsNearby = _mutualFriendsNearby
+          .where((p) => p.memberId != memberId)
+          .toList();
+      _friendSearchResults = _friendSearchResults
+          .where((p) => p.memberId != memberId)
+          .toList();
+      notifyListeners();
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not block member.';
+    }
+  }
+
+  Future<String?> submitSafetyReport({
+    required String category,
+    String? description,
+    String? reportedMemberId,
+  }) async {
+    final branch = _session?.branch ?? _selectedBranch;
+    try {
+      _lastSafetyReport = await _safety.submitSafetyReport(
+        category: category,
+        branch: branch,
+        description: description,
+        reportedMemberId: reportedMemberId,
+        sessionId: _session?.id,
+      );
+      notifyListeners();
+      return null;
+    } on SafetySocialException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Could not submit report.';
+    }
+  }
+
+  Future<(RideAssistRequest?, String?)> requestRideAssist({
+    required String destination,
+  }) async {
+    final branch = _session?.branch ?? _selectedBranch;
+    try {
+      final ride = await _safety.requestRideAssist(
+        pickupBranch: branch,
+        destination: destination,
+      );
+      _lastRideAssistRequest = ride;
+      notifyListeners();
+      return (ride, null);
+    } on SafetySocialException catch (e) {
+      return (null, e.message);
+    } catch (_) {
+      return (null, 'Could not request ride assistance.');
+    }
+  }
+
+  Future<(InsuranceIncident?, String?)> createInsuranceIncident({
+    required String incidentType,
+    required bool consentToShare,
+    String? reportId,
+  }) async {
+    try {
+      final incident = await _safety.createInsuranceIncident(
+        incidentType: incidentType,
+        consentToShare: consentToShare,
+        reportId: reportId,
+      );
+      _lastInsuranceIncident = incident;
+      notifyListeners();
+      return (incident, null);
+    } on SafetySocialException catch (e) {
+      return (null, e.message);
+    } catch (_) {
+      return (null, 'Could not create insurance incident.');
+    }
   }
 
   Future<(SocialMeet?, String?)> raiseMeetToast({int minutes = 2}) async {
@@ -1502,33 +2677,42 @@ class AppState extends ChangeNotifier {
   }) async {
     if (_user == null) return (null, 'Not signed in.');
     if (!canSpendTime) return (null, 'You need to be inside with time left.');
+    if (_walletBusy) {
+      return (null, 'Hang on — another spend is still processing.');
+    }
     final seconds = minutes * 60;
     if (timeBalance < seconds) {
       return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
     }
 
     try {
-      final meet = await _social.raiseMeet(
-        seconds: seconds,
-        kind: kind,
-        hostId: _user!.id,
-        hostName: _user!.name,
-      );
-      if (usesCloud) {
-        _user = await _auth.refreshProfile() ?? _user;
-      } else {
-        _user = await _auth.deductTimeBalance(seconds);
-      }
-      _activeMeet = meet;
-      final label = kind == MeetKind.duoBeat ? 'duo Beat Sync' : 'Toast to Meet';
-      _addFeedEvent(
-        'raised a $label${meet.code != null ? ' — code ${meet.code}' : ''}',
-      );
-      _addPoints(6);
-      unawaited(_sounds.playGlassClink());
-      _syncLiveActivity(force: true);
-      notifyListeners();
-      return (meet, null);
+      final outcome = await _runExclusiveWallet<(SocialMeet?, String?)>(() async {
+        if (timeBalance < seconds) {
+          return (null, 'Not enough time. Need ${_formatMinutes(seconds)}.');
+        }
+        final meet = await _social.raiseMeet(
+          seconds: seconds,
+          kind: kind,
+          hostId: _user!.id,
+          hostName: _user!.name,
+        );
+        if (usesCloud) {
+          _user = await _auth.refreshProfile() ?? _user;
+        } else {
+          _user = await _auth.deductTimeBalance(seconds);
+        }
+        _activeMeet = meet;
+        final label = kind == MeetKind.duoBeat
+            ? 'duo Beat Sync'
+            : 'Toast to Meet';
+        _addFeedEvent(
+          'raised a $label${meet.code != null ? ' — code ${meet.code}' : ''}',
+        );
+        _addPoints(6);
+        unawaited(_sounds.playGlassClink());
+        return (meet, null);
+      }, onBusy: (null, 'Hang on — another spend is still processing.'));
+      return outcome ?? (null, 'Could not raise meet.');
     } on SocialPlayException catch (e) {
       return (null, e.message);
     } catch (_) {
@@ -1644,7 +2828,8 @@ class AppState extends ChangeNotifier {
             _user?.id == meet.hostId) {
           _progressChallenge('chal-4', by: 1);
         }
-        if (meet.status == MeetStatus.completed && meet.kind == MeetKind.duoBeat) {
+        if (meet.status == MeetStatus.completed &&
+            meet.kind == MeetKind.duoBeat) {
           _awardDuoCompletion(meet);
         }
         notifyListeners();
@@ -1657,7 +2842,8 @@ class AppState extends ChangeNotifier {
     if (_awardedMeetCompletions.contains(meet.id)) return;
     _awardedMeetCompletions.add(meet.id);
     final won = meet.winnerId == _user!.id;
-    final draw = meet.winnerId == null &&
+    final draw =
+        meet.winnerId == null &&
         meet.hostScore != null &&
         meet.guestScore != null;
     if (won) {
@@ -1687,10 +2873,12 @@ class AppState extends ChangeNotifier {
   void dispose() {
     stopStaffTipWatch();
     stopPresencePolling();
+    stopSocialInboxPolling();
     _stopCurrencyRealtime();
     _timer?.cancel();
     _qrRefreshTimer?.cancel();
     _syncTimer?.cancel();
+    _autoBadgeOutTimer?.cancel();
     unawaited(_liveActivity.end());
     _sessionStore.unsubscribe();
     _sessionStore.removeListener(_onSessionStoreChanged);
@@ -1698,7 +2886,6 @@ class AppState extends ChangeNotifier {
     super.dispose();
   }
 }
-
 
 class PendingWalletCredit {
   const PendingWalletCredit({

@@ -54,7 +54,7 @@ class AuthService {
     return MemberUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
   }
 
-  Future<MemberUser> signUp({
+  Future<SignUpResult> signUp({
     required String name,
     required String email,
     required String password,
@@ -73,29 +73,56 @@ class AuthService {
     }
 
     if (usesSupabase) {
-      final response = await _client!.auth.signUp(
-        email: user.email,
-        password: password,
-        data: {
-          'name': user.name,
-          'birthdate': birthdate.toIso8601String().split('T').first,
-          'role': UserRole.member.name,
-        },
-      );
+      final AuthResponse response;
+      try {
+        response = await _client!.auth.signUp(
+          email: user.email,
+          password: password,
+          data: {
+            'name': user.name,
+            'birthdate': birthdate.toIso8601String().split('T').first,
+            'role': UserRole.member.name,
+          },
+        );
+      } catch (e) {
+        final msg = e.toString().toLowerCase();
+        if (msg.contains('already registered') || msg.contains('already been registered')) {
+          throw AuthException('That email already has a pass. Sign in instead.');
+        }
+        throw AuthException('Sign up failed. Check your connection and try again.');
+      }
 
       final authUser = response.user;
       if (authUser == null) {
         throw AuthException('Sign up failed. Please try again.');
       }
 
+      // Supabase confirm-email ON → no session until the link is opened.
       if (response.session == null) {
-        throw AuthException('Check your email to confirm your account, then sign in.');
+        return SignUpResult.needsEmailVerification(
+          email: user.email,
+          name: user.name,
+        );
       }
 
-      return _ensureProfile(authUser);
+      final member = await _ensureProfile(authUser);
+      return SignUpResult.signedIn(member);
     }
 
-    return _localSignUp(user: user, password: password);
+    final member = await _localSignUp(user: user, password: password);
+    return SignUpResult.signedIn(member);
+  }
+
+  Future<void> resendSignupConfirmation(String email) async {
+    if (!usesSupabase) return;
+    try {
+      await _client!.auth.resend(
+        type: OtpType.signup,
+        email: email.trim().toLowerCase(),
+      );
+    } catch (_) {
+      throw AuthException('Could not resend the email. Wait a moment and try again.');
+    }
   }
 
   Future<MemberUser> login({
@@ -250,21 +277,144 @@ class AuthService {
     if (usesSupabase) {
       final user = await getCurrentUser();
       if (user == null) throw AuthException('Not signed in.');
-      if (user.timeBalanceSeconds < seconds) {
-        throw AuthException('Not enough time balance.');
+      try {
+        final row = await _client!.rpc(
+          'spend_time_balance',
+          params: {'p_seconds': seconds},
+        );
+        if (row is Map<String, dynamic>) {
+          return MemberUser.fromSupabaseProfile(row);
+        }
+        return _fetchProfile(user.id);
+      } catch (e) {
+        // Fallback when migration 021 is not applied yet — conditional update.
+        final msg = e.toString().toLowerCase();
+        if (msg.contains('not enough time') || msg.contains('enough time balance')) {
+          throw AuthException('Not enough time balance.');
+        }
+        if (user.timeBalanceSeconds < seconds) {
+          throw AuthException('Not enough time balance.');
+        }
+        final next = user.timeBalanceSeconds - seconds;
+        final updated = await _client!
+            .from('profiles')
+            .update({'time_balance_seconds': next})
+            .eq('id', user.id)
+            .gte('time_balance_seconds', seconds)
+            .select()
+            .maybeSingle();
+        if (updated == null) {
+          throw AuthException('Not enough time balance.');
+        }
+        return MemberUser.fromSupabaseProfile(updated);
       }
-      final next = user.timeBalanceSeconds - seconds;
-      await _client!
-          .from('profiles')
-          .update({'time_balance_seconds': next})
-          .eq('id', user.id);
-      return _fetchProfile(user.id);
     }
 
     return _updateLocalUserBalance(-seconds);
   }
 
-  /// Set wallet balance directly (used by lounge timer sync).
+  /// Relative timer sync — subtract debt without absolute overwrite.
+  Future<MemberUser> applyTimerDebt(int seconds) async {
+    if (seconds <= 0) return (await getCurrentUser())!;
+
+    if (usesSupabase) {
+      final user = await getCurrentUser();
+      if (user == null) throw AuthException('Not signed in.');
+      try {
+        final row = await _client!.rpc(
+          'apply_timer_debt',
+          params: {'p_seconds': seconds},
+        );
+        if (row is Map<String, dynamic>) {
+          return MemberUser.fromSupabaseProfile(row);
+        }
+        return _fetchProfile(user.id);
+      } catch (_) {
+        final next = (user.timeBalanceSeconds - seconds).clamp(0, 1 << 31);
+        await _client!
+            .from('profiles')
+            .update({'time_balance_seconds': next})
+            .eq('id', user.id);
+        return _fetchProfile(user.id);
+      }
+    }
+
+    return _updateLocalUserBalance(-seconds);
+  }
+
+  Future<MemberUser> consumeIncludedDrink({String? sessionId}) async {
+    if (usesSupabase) {
+      final user = await getCurrentUser();
+      if (user == null) throw AuthException('Not signed in.');
+      try {
+        final row = await _client!.rpc(
+          'consume_included_drink',
+          params: {'p_session_id': sessionId},
+        );
+        if (row is Map<String, dynamic>) {
+          return MemberUser.fromSupabaseProfile(row);
+        }
+        return _fetchProfile(user.id);
+      } catch (e) {
+        final msg = e.toString().toLowerCase();
+        if (msg.contains('no package drinks')) {
+          throw AuthException('No package drinks remaining.');
+        }
+        if (user.includedDrinksRemaining < 1) {
+          throw AuthException('No package drinks remaining.');
+        }
+        final next = user.includedDrinksRemaining - 1;
+        await _client!
+            .from('profiles')
+            .update({'included_drinks_remaining': next})
+            .eq('id', user.id)
+            .gte('included_drinks_remaining', 1);
+        return _fetchProfile(user.id);
+      }
+    }
+
+    final current = await getCurrentUser();
+    if (current == null) throw AuthException('Not signed in.');
+    if (current.includedDrinksRemaining < 1) {
+      throw AuthException('No package drinks remaining.');
+    }
+    return _updateLocalUserDrinks(current.includedDrinksRemaining - 1);
+  }
+
+  Future<MemberUser> redeemVenueActivity({
+    required String activitySlug,
+    required int minutes,
+    String? sessionId,
+  }) async {
+    if (usesSupabase) {
+      final user = await getCurrentUser();
+      if (user == null) throw AuthException('Not signed in.');
+      try {
+        final row = await _client!.rpc(
+          'redeem_venue_activity',
+          params: {
+            'p_activity_slug': activitySlug,
+            'p_session_id': sessionId,
+            'p_minutes': minutes,
+          },
+        );
+        if (row is Map<String, dynamic>) {
+          return MemberUser.fromSupabaseProfile(row);
+        }
+        return _fetchProfile(user.id);
+      } catch (e) {
+        final msg = e.toString().toLowerCase();
+        if (msg.contains('not enough time')) {
+          throw AuthException('Not enough time balance.');
+        }
+        return deductTimeBalance(minutes * 60);
+      }
+    }
+
+    return deductTimeBalance(minutes * 60);
+  }
+
+  /// Set wallet balance directly (admin / local restore only).
   Future<MemberUser> setTimeBalance(int seconds) async {
     final clamped = seconds.clamp(0, 1 << 31);
 
@@ -279,6 +429,39 @@ class AuthService {
     }
 
     return _updateLocalUserBalance(clamped - (await getCurrentUser())!.timeBalanceSeconds);
+  }
+
+  Future<MemberUser> _updateLocalUserDrinks(int remaining) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_userKey);
+    if (raw == null) throw AuthException('Not signed in.');
+
+    final user = MemberUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    final updated = user.copyWith(includedDrinksRemaining: remaining.clamp(0, 1 << 31));
+    await prefs.setString(_userKey, jsonEncode(updated.toJson()));
+
+    final accounts = _readAccounts(prefs);
+    final account = accounts[user.email];
+    if (account != null) {
+      account['user'] = updated.toJson();
+      await prefs.setString(_authKey, jsonEncode(accounts));
+    }
+
+    return updated;
+  }
+
+  /// Persist a fully updated local user row (demo / offline mode).
+  Future<MemberUser> persistLocalUser(MemberUser user) async {
+    if (usesSupabase) return user;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_userKey, jsonEncode(user.toJson()));
+    final accounts = _readAccounts(prefs);
+    final account = accounts[user.email];
+    if (account != null) {
+      account['user'] = user.toJson();
+      await prefs.setString(_authKey, jsonEncode(accounts));
+    }
+    return user;
   }
 
   Future<MemberUser> _updateLocalUserBalance(int delta) async {
@@ -444,6 +627,37 @@ class AuthService {
   String _hashPassword(String password) {
     return sha256.convert(utf8.encode(password)).toString();
   }
+}
+
+class SignUpResult {
+  const SignUpResult._({
+    required this.email,
+    required this.name,
+    required this.needsEmailVerification,
+    this.user,
+  });
+
+  factory SignUpResult.signedIn(MemberUser user) => SignUpResult._(
+        email: user.email,
+        name: user.name,
+        needsEmailVerification: false,
+        user: user,
+      );
+
+  factory SignUpResult.needsEmailVerification({
+    required String email,
+    required String name,
+  }) =>
+      SignUpResult._(
+        email: email,
+        name: name,
+        needsEmailVerification: true,
+      );
+
+  final String email;
+  final String name;
+  final bool needsEmailVerification;
+  final MemberUser? user;
 }
 
 class AuthException implements Exception {

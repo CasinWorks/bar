@@ -11,6 +11,9 @@ class MemberUser {
     this.timeBalanceSeconds = 0,
     this.isBanned = false,
     this.isWhitelisted = false,
+    this.activePackageSlug,
+    this.includedDrinksRemaining = 0,
+    this.includedDrinksTotal = 0,
   });
 
   final String id;
@@ -22,6 +25,9 @@ class MemberUser {
   final int timeBalanceSeconds;
   final bool isBanned;
   final bool isWhitelisted;
+  final String? activePackageSlug;
+  final int includedDrinksRemaining;
+  final int includedDrinksTotal;
 
   bool get isStaff => role == UserRole.staff;
   bool get isAdmin => role == UserRole.admin || role == UserRole.hr;
@@ -55,6 +61,9 @@ class MemberUser {
         'timeBalanceSeconds': timeBalanceSeconds,
         'isBanned': isBanned,
         'isWhitelisted': isWhitelisted,
+        'activePackageSlug': activePackageSlug,
+        'includedDrinksRemaining': includedDrinksRemaining,
+        'includedDrinksTotal': includedDrinksTotal,
       };
 
   factory MemberUser.fromJson(Map<String, dynamic> json) => MemberUser(
@@ -69,6 +78,9 @@ class MemberUser {
         timeBalanceSeconds: json['timeBalanceSeconds'] as int? ?? 0,
         isBanned: json['isBanned'] as bool? ?? false,
         isWhitelisted: json['isWhitelisted'] as bool? ?? false,
+        activePackageSlug: json['activePackageSlug'] as String?,
+        includedDrinksRemaining: json['includedDrinksRemaining'] as int? ?? 0,
+        includedDrinksTotal: json['includedDrinksTotal'] as int? ?? 0,
       );
 
   factory MemberUser.fromSupabaseProfile(Map<String, dynamic> json) {
@@ -83,6 +95,9 @@ class MemberUser {
       timeBalanceSeconds: json['time_balance_seconds'] as int? ?? 0,
       isBanned: json['is_banned'] as bool? ?? false,
       isWhitelisted: json['is_whitelisted'] as bool? ?? false,
+      activePackageSlug: json['active_package_slug'] as String?,
+      includedDrinksRemaining: json['included_drinks_remaining'] as int? ?? 0,
+      includedDrinksTotal: json['included_drinks_total'] as int? ?? 0,
     );
   }
 
@@ -93,6 +108,9 @@ class MemberUser {
     int? timeBalanceSeconds,
     bool? isBanned,
     bool? isWhitelisted,
+    String? activePackageSlug,
+    int? includedDrinksRemaining,
+    int? includedDrinksTotal,
   }) =>
       MemberUser(
         id: id,
@@ -104,5 +122,9 @@ class MemberUser {
         timeBalanceSeconds: timeBalanceSeconds ?? this.timeBalanceSeconds,
         isBanned: isBanned ?? this.isBanned,
         isWhitelisted: isWhitelisted ?? this.isWhitelisted,
+        activePackageSlug: activePackageSlug ?? this.activePackageSlug,
+        includedDrinksRemaining:
+            includedDrinksRemaining ?? this.includedDrinksRemaining,
+        includedDrinksTotal: includedDrinksTotal ?? this.includedDrinksTotal,
       );
 }

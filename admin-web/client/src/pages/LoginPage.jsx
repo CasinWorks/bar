@@ -29,8 +29,8 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="card login-card">
-        <h2 className="page-title">Admin Console</h2>
-        <p className="page-sub">Cash desk · time loads · guest list · HR</p>
+        <h2 className="page-title">Blind Tiger Admin</h2>
+        <p className="page-sub">Cash desk · packages · guest list · HR</p>
         {error && <p className="error">{error}</p>}
         <form onSubmit={handleSubmit}>
           <label>Email</label>
@@ -42,7 +42,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="page-sub" style={{ marginTop: 16, marginBottom: 0 }}>
-          <Link to="/" style={{ color: 'var(--gold, #c5a059)' }}>
+          <Link to="/" style={{ color: 'var(--tiger-red)' }}>
             ← Back to welcome
           </Link>
         </p>

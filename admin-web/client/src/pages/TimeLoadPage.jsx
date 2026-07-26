@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api, formatDate, formatDuration, formatPeso, formatTimeLoad } from '../lib/api';
-import { CASH_PACKAGES, previewLoad } from '../lib/timePricing';
+import { ENTRY_PACKAGES, previewLoad } from '../lib/timePricing';
+
+const BONUS_RULES = [
+  { slug: 'birthday', name: 'Birthday Celebration', minutes: 15 },
+  { slug: 'bring-a-friend', name: 'Bring a Friend', minutes: 20 },
+  { slug: 'club-games', name: 'Win Club Games', minutes: 30 },
+  { slug: 'dance-competition', name: 'Dance Competition', minutes: 60 },
+  { slug: 'social-media', name: 'Social Media', minutes: 10 },
+  { slug: 'loyalty-daily', name: 'Loyalty Daily', minutes: 10 },
+  { slug: 'special-events', name: 'Special Events', minutes: null },
+];
 
 export default function TimeLoadPage() {
   const { token } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [loads, setLoads] = useState([]);
   const [recipientId, setRecipientId] = useState('');
-  const [selectedBill, setSelectedBill] = useState(1000);
-  const [billCount, setBillCount] = useState(1);
+  const [selectedSlug, setSelectedSlug] = useState('standard-night');
+  const [quantity, setQuantity] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [notes, setNotes] = useState('');
   const [msg, setMsg] = useState('');
@@ -17,10 +27,13 @@ export default function TimeLoadPage() {
   const [busy, setBusy] = useState(false);
   const [voidingId, setVoidingId] = useState(null);
   const [voidReason, setVoidReason] = useState('');
+  const [bonusRule, setBonusRule] = useState('birthday');
+  const [bonusMinutes, setBonusMinutes] = useState('');
+  const [bonusRecipient, setBonusRecipient] = useState('');
 
   const preview = useMemo(
-    () => previewLoad(selectedBill, billCount, paymentMethod),
-    [selectedBill, billCount, paymentMethod],
+    () => previewLoad(selectedSlug, quantity, paymentMethod),
+    [selectedSlug, quantity, paymentMethod],
   );
 
   async function refresh() {
@@ -47,8 +60,8 @@ export default function TimeLoadPage() {
         token,
         body: {
           recipientId,
-          amountPeso: selectedBill,
-          billCount,
+          packageSlug: selectedSlug,
+          quantity,
           paymentMethod,
           notes,
         },
@@ -57,11 +70,41 @@ export default function TimeLoadPage() {
         paymentMethod === 'complimentary'
           ? `${result.totalMinutes} min comp`
           : `${formatPeso(result.totalPeso)} collected`;
+      const drinksBit =
+        result.drinks == null ? 'drinks unlimited (soft cap)' : `${result.drinks} drinks`;
       setMsg(
-        `Loaded ${result.totalMinutes} min — ${tender}. Member phone updates live.`,
+        `Loaded ${result.packageName ?? selectedSlug}: ${result.totalMinutes} min · ${drinksBit} — ${tender}.`,
       );
       setNotes('');
-      setBillCount(1);
+      setQuantity(1);
+      await refresh();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleBonus(e) {
+    e.preventDefault();
+    setErr('');
+    setMsg('');
+    setBusy(true);
+    try {
+      const rule = BONUS_RULES.find((r) => r.slug === bonusRule);
+      const mins = bonusMinutes ? Number(bonusMinutes) : rule?.minutes;
+      await api('/api/time-loads/bonus', {
+        method: 'POST',
+        token,
+        body: {
+          recipientId: bonusRecipient || recipientId,
+          ruleSlug: bonusRule,
+          minutes: mins,
+          notes: notes || undefined,
+        },
+      });
+      setMsg(`Bonus time awarded (${mins ?? '?'} min).`);
+      setBonusMinutes('');
       await refresh();
     } catch (e) {
       setErr(e.message);
@@ -101,9 +144,9 @@ export default function TimeLoadPage() {
 
   return (
     <>
-      <h2 className="page-title">Load Time — Cash Desk</h2>
+      <h2 className="page-title">Load Package — Cash Desk</h2>
       <p className="page-sub">
-        POS-style bills only. Pick what the guest handed you — time credits automatically.
+        Time is the currency. Sell an entry package — minutes and drink allowance credit automatically.
       </p>
 
       <div className="card">
@@ -120,16 +163,17 @@ export default function TimeLoadPage() {
             ))}
           </select>
 
-          <label>Bill received</label>
+          <label>Entry package</label>
           <div className="bill-grid">
-            {CASH_PACKAGES.map((pkg) => (
+            {ENTRY_PACKAGES.map((pkg) => (
               <button
-                key={pkg.peso}
+                key={pkg.slug}
                 type="button"
-                className={`bill-btn${selectedBill === pkg.peso ? ' selected' : ''}`}
-                onClick={() => setSelectedBill(pkg.peso)}
+                className={`bill-btn${selectedSlug === pkg.slug ? ' selected' : ''}`}
+                onClick={() => setSelectedSlug(pkg.slug)}
               >
-                <span className="bill-amount">{formatPeso(pkg.peso)}</span>
+                <span className="bill-amount">{pkg.name}</span>
+                <span className="bill-time">{formatPeso(pkg.peso)}</span>
                 <span className="bill-time">{pkg.label}</span>
               </button>
             ))}
@@ -137,9 +181,9 @@ export default function TimeLoadPage() {
 
           <div className="form-row">
             <div>
-              <label>How many of this bill?</label>
-              <select value={billCount} onChange={(e) => setBillCount(Number(e.target.value))}>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <label>Quantity</label>
+              <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}>
+                {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
                     ×{n}
                   </option>
@@ -164,6 +208,12 @@ export default function TimeLoadPage() {
                 <div className="stat-value stat-timer">{preview.totalMinutes} min</div>
               </div>
               <div>
+                <span className="stat-label">Drinks included</span>
+                <div className="stat-value">
+                  {preview.drinks == null ? 'Unlimited*' : preview.drinks}
+                </div>
+              </div>
+              <div>
                 <span className="stat-label">
                   {paymentMethod === 'complimentary' ? 'Comp value' : 'Cash to drawer'}
                 </span>
@@ -182,7 +232,52 @@ export default function TimeLoadPage() {
             placeholder="Receipt #, promo, who comped…"
           />
           <button className="btn" type="submit" disabled={busy || !recipientId}>
-            {busy ? 'Loading…' : `Credit ${preview?.totalMinutes ?? 0} min`}
+            {busy ? 'Loading…' : `Credit ${preview?.name ?? 'package'}`}
+          </button>
+        </form>
+      </div>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Award bonus time</h3>
+        <form onSubmit={handleBonus}>
+          <label>Account</label>
+          <select
+            value={bonusRecipient || recipientId}
+            onChange={(e) => setBonusRecipient(e.target.value)}
+            required
+          >
+            <option value="">Select account…</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} — {a.email}
+              </option>
+            ))}
+          </select>
+          <div className="form-row">
+            <div>
+              <label>Bonus</label>
+              <select value={bonusRule} onChange={(e) => setBonusRule(e.target.value)}>
+                {BONUS_RULES.map((r) => (
+                  <option key={r.slug} value={r.slug}>
+                    {r.name}
+                    {r.minutes != null ? ` (+${r.minutes}m)` : ' (variable)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label>Minutes (override)</label>
+              <input
+                type="number"
+                min="1"
+                value={bonusMinutes}
+                onChange={(e) => setBonusMinutes(e.target.value)}
+                placeholder="Auto from rule"
+              />
+            </div>
+          </div>
+          <button className="btn btn-secondary" type="submit" disabled={busy}>
+            Award bonus minutes
           </button>
         </form>
       </div>
@@ -194,6 +289,7 @@ export default function TimeLoadPage() {
             <tr>
               <th>When</th>
               <th>Account</th>
+              <th>Package</th>
               <th>Time</th>
               <th>Tender</th>
               <th>By</th>
@@ -207,19 +303,18 @@ export default function TimeLoadPage() {
               <tr key={l.id} style={voided ? { opacity: 0.55 } : undefined}>
                 <td>{formatDate(l.created_at)}</td>
                 <td>{l.recipient?.name ?? l.member?.name}</td>
+                <td>{l.package_slug ?? '—'}</td>
                 <td>
                   {formatDuration(l.seconds_loaded)}
+                  {l.drinks_granted != null && (
+                    <span style={{ color: 'var(--muted)', fontSize: 11 }}> · {l.drinks_granted} drinks</span>
+                  )}
                   {voided && <span className="badge badge-red" style={{ marginLeft: 6 }}>VOIDED</span>}
                 </td>
                 <td>
                   {l.payment_method === 'complimentary'
                     ? 'Comp'
                     : formatPeso(l.amount_peso)}
-                  {l.payment_method !== 'cash' && l.payment_method !== 'complimentary' && (
-                    <span className="badge badge-gold" style={{ marginLeft: 6 }}>
-                      {l.payment_method}
-                    </span>
-                  )}
                 </td>
                 <td>{voided ? l.voider?.name : l.loader?.name}</td>
                 <td>
@@ -246,11 +341,6 @@ export default function TimeLoadPage() {
                         Void
                       </button>
                     )
-                  )}
-                  {voided && l.void_reason && (
-                    <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block' }}>
-                      Voided {formatDate(l.voided_at)} — {l.void_reason}
-                    </span>
                   )}
                 </td>
               </tr>

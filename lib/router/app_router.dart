@@ -1,8 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/club_session.dart';
 import '../providers/app_state.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/member_tutorial_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/auth/verify_email_screen.dart';
+import '../screens/legal/legal_document_screen.dart';
 import '../screens/auth/welcome_screen.dart';
 import '../screens/gate/entry_exit_gate_screen.dart';
 import '../screens/lounge/active_lounge_screen.dart';
@@ -16,8 +20,12 @@ import '../screens/summary/summary_screen.dart';
 import 'member_routes.dart';
 
 class AppRouter {
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   static GoRouter create(AppState appState) {
     return GoRouter(
+      navigatorKey: navigatorKey,
       initialLocation: '/',
       refreshListenable: appState,
       redirect: (context, state) {
@@ -25,11 +33,21 @@ class AppRouter {
         if (app.isLoading) return null;
 
         final loc = state.matchedLocation;
-        final isPublic = loc == '/' || loc == '/login' || loc == '/signup';
+        final isPublic = loc == '/' ||
+            loc == '/login' ||
+            loc == '/signup' ||
+            loc == '/verify-email' ||
+            loc == '/privacy' ||
+            loc == '/terms';
 
         if (!app.isAuthenticated && !isPublic) return '/';
 
-        if (app.isAuthenticated && (loc == '/' || loc == '/login' || loc == '/signup')) {
+        if (app.isAuthenticated &&
+            (loc == '/' ||
+                loc == '/login' ||
+                loc == '/signup' ||
+                loc == '/verify-email')) {
+          if (app.needsMemberTutorial) return '/member-tutorial';
           return routeForAppState(app);
         }
 
@@ -39,6 +57,18 @@ class AppRouter {
         if (app.isStaff) {
           if (loc == '/staff' || loc == '/staff/tip-pad') return null;
           return '/staff';
+        }
+
+        // First-run member briefing (skip if already mid-visit).
+        if (app.needsMemberTutorial &&
+            app.sessionPhase == SessionPhase.none &&
+            !app.hasCheckoutReceipt) {
+          if (loc != '/member-tutorial') return '/member-tutorial';
+          return null;
+        }
+
+        if (loc == '/member-tutorial') {
+          return routeForMemberState(app);
         }
 
         // Members cannot access staff scanner
@@ -87,6 +117,32 @@ class AppRouter {
         GoRoute(path: '/', builder: (_, _) => const WelcomeScreen()),
         GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
         GoRoute(path: '/signup', builder: (_, _) => const SignupScreen()),
+        GoRoute(
+          path: '/verify-email',
+          builder: (context, state) {
+            final email = state.uri.queryParameters['email'] ?? '';
+            final name = state.uri.queryParameters['name'] ?? '';
+            return VerifyEmailScreen(email: email, name: name);
+          },
+        ),
+        GoRoute(
+          path: '/member-tutorial',
+          builder: (_, _) => const MemberTutorialScreen(),
+        ),
+        GoRoute(
+          path: '/privacy',
+          builder: (_, _) => const LegalDocumentScreen(
+            title: 'Privacy Policy',
+            assetPath: LegalDocumentScreen.privacyAsset,
+          ),
+        ),
+        GoRoute(
+          path: '/terms',
+          builder: (_, _) => const LegalDocumentScreen(
+            title: 'Terms of Use',
+            assetPath: LegalDocumentScreen.termsAsset,
+          ),
+        ),
         GoRoute(path: '/pricing', builder: (_, _) => const PricingScreen()),
         GoRoute(path: '/checkout', builder: (_, _) => const CheckoutScreen()),
         // Routes kept so deep links don't crash; redirect above sends guests away.

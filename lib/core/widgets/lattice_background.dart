@@ -74,7 +74,7 @@ class _GradientLayerState extends State<_GradientLayer>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppColors.microclubBg, AppColors.darkBackground],
+            colors: [AppColors.microclubBg, AppColors.matteBlack],
           ),
         ),
       );
@@ -86,8 +86,12 @@ class _GradientLayerState extends State<_GradientLayer>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF1C0500), AppColors.darkBackground, Color(0xFF0A0000)],
-            stops: [0.0, 0.5, 1.0],
+            colors: [
+              Color(0xFF1A0808),
+              AppColors.matteBlack,
+              Color(0xFF0A0505),
+            ],
+            stops: [0.0, 0.55, 1.0],
           ),
         ),
       );
@@ -98,13 +102,13 @@ class _GradientLayerState extends State<_GradientLayer>
       builder: (context, _) {
         final t = _controller.value;
         final top = Color.lerp(
-          const Color(0xFF1C0500),
-          const Color(0xFF2A0C00),
+          const Color(0xFF1A0808),
+          const Color(0xFF2A0C0C),
           t,
         )!;
         final mid = Color.lerp(
-          AppColors.darkBackground,
-          const Color(0xFF120505),
+          AppColors.matteBlack,
+          const Color(0xFF120808),
           t,
         )!;
         return DecoratedBox(
@@ -112,7 +116,7 @@ class _GradientLayerState extends State<_GradientLayer>
             gradient: LinearGradient(
               begin: Alignment(-0.2 + t * 0.4, -1),
               end: Alignment(0.2 - t * 0.4, 1),
-              colors: [top, mid, const Color(0xFF0A0000)],
+              colors: [top, mid, const Color(0xFF0A0505)],
               stops: const [0.0, 0.5, 1.0],
             ),
           ),
@@ -126,8 +130,8 @@ class _LatticePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.goldBrushed.withValues(alpha: 0.06)
-      ..strokeWidth = 0.8
+      ..color = AppColors.tigerRed.withValues(alpha: 0.05)
+      ..strokeWidth = 0.7
       ..style = PaintingStyle.stroke;
 
     const spacing = 40.0;
@@ -165,7 +169,7 @@ class GoldGradientText extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShaderMask(
       shaderCallback: (bounds) => const LinearGradient(
-        colors: [AppColors.goldBright, AppColors.goldBrushed, AppColors.goldDark],
+        colors: [AppColors.tigerRed, Color(0xFFE85A5F), AppColors.bloodRed],
       ).createShader(bounds),
       child: Text(
         text,
@@ -197,19 +201,19 @@ class LuxuryCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1C0A00), Color(0xFF050000)],
+          colors: [AppColors.charcoal, Color(0xFF120808)],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: highlighted
-              ? AppColors.goldBrushed
-              : AppColors.goldBrushed.withValues(alpha: 0.2),
+              ? AppColors.tigerRed
+              : AppColors.darkSteel,
           width: highlighted ? 1.5 : 1,
         ),
         boxShadow: highlighted
             ? [
                 BoxShadow(
-                  color: AppColors.crimson.withValues(alpha: 0.35),
+                  color: AppColors.tigerRed.withValues(alpha: 0.35),
                   blurRadius: 20,
                 ),
               ]
@@ -240,25 +244,27 @@ class TigerButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 44,
+      height: 48,
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: secondary
               ? null
               : const LinearGradient(
-                  colors: [Color(0xFFB45309), AppColors.crimson],
+                  colors: [AppColors.tigerRed, AppColors.bloodRed],
                 ),
-          color: secondary ? AppColors.neutral900 : null,
+          color: secondary ? AppColors.darkSteel : null,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppColors.goldBrushed.withValues(alpha: 0.4),
+            color: secondary
+                ? AppColors.darkSteel
+                : AppColors.tigerRed.withValues(alpha: 0.6),
           ),
           boxShadow: secondary
               ? null
               : [
                   BoxShadow(
-                    color: AppColors.crimson.withValues(alpha: 0.35),
-                    blurRadius: 12,
+                    color: AppColors.tigerRed.withValues(alpha: 0.4),
+                    blurRadius: 14,
                   ),
                 ],
         ),
@@ -267,14 +273,17 @@ class TigerButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
-            foregroundColor: secondary ? AppColors.textLight : AppColors.goldBright,
+            foregroundColor: AppColors.offWhite,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: isLoading
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.offWhite,
+                  ),
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -284,7 +293,7 @@ class TigerButton extends StatelessWidget {
                       label,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
+                        letterSpacing: 1.2,
                         fontSize: 12,
                       ),
                     ),

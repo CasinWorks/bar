@@ -5,11 +5,14 @@ import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import PlatformPage from './pages/PlatformPage';
 import TimeLoadPage from './pages/TimeLoadPage';
 import UsersPage from './pages/UsersPage';
 import EventsPage from './pages/EventsPage';
 import GuestsPage from './pages/GuestsPage';
 import HrPage from './pages/HrPage';
+import SafetySocialPage from './pages/SafetySocialPage';
+import BranchesPage from './pages/BranchesPage';
 
 function Protected({ children }) {
   const { session, profile, loading, accessError, signOut } = useAuth();
@@ -47,10 +50,13 @@ export default function App() {
             }
           >
             <Route index element={<DashboardPage />} />
+            <Route path="platform" element={<PlatformPage />} />
             <Route path="time-load" element={<TimeLoadPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="events" element={<EventsPage />} />
             <Route path="guests" element={<GuestsPage />} />
+            <Route path="branches" element={<BranchesPage />} />
+            <Route path="safety-social" element={<SafetySocialPage />} />
             <Route path="hr" element={<HrPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

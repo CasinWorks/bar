@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/animated_time_display.dart';
 import '../../core/widgets/lattice_background.dart';
@@ -8,6 +9,7 @@ import '../../core/widgets/tiger_motion.dart';
 import '../../models/blind_tiger_models.dart';
 import '../../providers/app_state.dart';
 import 'lounge_tabs.dart';
+import 'night_hub_sheet.dart';
 import 'pass_the_glass_sheet.dart';
 import 'tip_bartender_sheet.dart';
 import 'time_depleted_overlay.dart';
@@ -124,6 +126,11 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          IconButton(
+            tooltip: 'Your night',
+            onPressed: () => NightHubSheet.show(context),
+            icon: const Icon(Icons.grid_view_rounded, color: AppColors.goldBright),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
@@ -142,7 +149,7 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _TimerCard extends StatelessWidget {
+class _TimerCard extends StatefulWidget {
   const _TimerCard({
     required this.timeRemaining,
     required this.timerColor,
@@ -159,67 +166,189 @@ class _TimerCard extends StatelessWidget {
   final bool isDepleted;
   final VoidCallback onPassGlass;
 
+  /// Short phones default collapsed so challenges/content keep room.
+  static const double shortScreenHeight = 720;
+
+  static const String _prefKey = 'lounge_timer_card_expanded';
+
+  @override
+  State<_TimerCard> createState() => _TimerCardState();
+}
+
+class _TimerCardState extends State<_TimerCard> {
+  /// Null until prefs resolve; UI falls back to screen-height default.
+  bool? _expandedPref;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExpandedPref();
+  }
+
+  Future<void> _loadExpandedPref() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final saved = prefs.getBool(_TimerCard._prefKey);
+      if (saved == null) return;
+      setState(() => _expandedPref = saved);
+    } catch (_) {}
+  }
+
+  bool _isExpanded(BuildContext context) {
+    if (_expandedPref != null) return _expandedPref!;
+    return MediaQuery.sizeOf(context).height >= _TimerCard.shortScreenHeight;
+  }
+
+  Future<void> _setExpanded(bool value) async {
+    setState(() => _expandedPref = value);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_TimerCard._prefKey, value);
+    } catch (_) {}
+  }
+
+  void _toggle(BuildContext context) => _setExpanded(!_isExpanded(context));
+
   @override
   Widget build(BuildContext context) {
     final roomState = context.watch<AppState>();
+    final expanded = _isExpanded(context);
+    final timerLabel = widget.isDepleted
+        ? 'TIME DEPLETED'
+        : AppColors.timerLabel(Duration(seconds: widget.timeRemaining));
+    final labelColor =
+        widget.isDepleted ? AppColors.tigerOrange : widget.timerColor;
+    final expandedFontSize = widget.timeRemaining >= 3600 ? 40.0 : 48.0;
+    final collapsedFontSize = widget.timeRemaining >= 3600 ? 26.0 : 30.0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, expanded ? 16 : 12, 16, expanded ? 16 : 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [Color(0xFF1C0F00), Color(0xFF050000)]),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: timerColor.withValues(alpha: 0.5)),
-        boxShadow: [BoxShadow(color: timerColor.withValues(alpha: 0.2), blurRadius: 20)],
+        border: Border.all(color: widget.timerColor.withValues(alpha: 0.5)),
+        boxShadow: [BoxShadow(color: widget.timerColor.withValues(alpha: 0.2), blurRadius: 20)],
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('$points PTS', style: const TextStyle(color: AppColors.goldBright, fontWeight: FontWeight.bold, fontSize: 11)),
-              Text(tier.label.toUpperCase(), style: TextStyle(color: tier.accentColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOutCubic,
+        alignment: Alignment.topCenter,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _toggle(context),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '${widget.points} PTS',
+                            style: const TextStyle(
+                              color: AppColors.goldBright,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            widget.tier.label.toUpperCase(),
+                            style: TextStyle(
+                              color: widget.tier.accentColor,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            expanded ? Icons.expand_less : Icons.expand_more,
+                            size: 22,
+                            color: AppColors.goldBright.withValues(alpha: 0.85),
+                          ),
+                        ],
+                      ),
+                      AnimatedTimeDisplay(
+                        seconds: widget.timeRemaining,
+                        color: widget.timerColor,
+                        fontSize: expanded ? expandedFontSize : collapsedFontSize,
+                      ),
+                      if (expanded)
+                        Text(
+                          timerLabel,
+                          style: TextStyle(
+                            color: labelColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      else
+                        Text(
+                          '$timerLabel · ${roomState.drinksAllowanceRemaining} drinks · ${widget.points} PTS',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: labelColor.withValues(alpha: 0.9),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (expanded) ...[
+              const SizedBox(height: 10),
+              Text(
+                '${roomState.drinksAllowanceRemaining} drinks left · package wallet',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              ),
+              const SizedBox(height: 10),
+              TigerButton(
+                label: 'YOUR NIGHT',
+                icon: Icons.grid_view_rounded,
+                onPressed: () => NightHubSheet.show(context),
+              ),
+              const SizedBox(height: 8),
+              TigerButton(
+                label: 'TIP BAR',
+                icon: Icons.nfc,
+                secondary: true,
+                onPressed: () => TipBartenderSheet.show(context),
+              ),
+              const SizedBox(height: 8),
+              TigerButton(
+                label: roomState.hasVvipRoomAccess
+                    ? 'VVIP ROOM'
+                    : roomState.hasVipRoomAccess
+                        ? 'VIP ROOM'
+                        : 'PRIVATE ROOMS',
+                icon: roomState.hasVvipRoomAccess
+                    ? Icons.auto_awesome
+                    : roomState.hasVipRoomAccess
+                        ? Icons.diamond
+                        : Icons.meeting_room,
+                secondary: true,
+                onPressed: () => VipRoomsSheet.show(context),
+              ),
+              const SizedBox(height: 8),
+              TigerButton(
+                label: 'PASS THE GLASS',
+                icon: Icons.local_bar,
+                secondary: true,
+                onPressed: widget.onPassGlass,
+              ),
             ],
-          ),
-          AnimatedTimeDisplay(
-            seconds: timeRemaining,
-            color: timerColor,
-            fontSize: timeRemaining >= 3600 ? 40 : 48,
-          ),
-          Text(
-            isDepleted ? 'TIME DEPLETED' : AppColors.timerLabel(Duration(seconds: timeRemaining)),
-            style: TextStyle(color: isDepleted ? AppColors.tigerOrange : timerColor, fontSize: 10, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          TigerButton(
-            label: 'TIP BAR',
-            icon: Icons.nfc,
-            secondary: true,
-            onPressed: () => TipBartenderSheet.show(context),
-          ),
-          const SizedBox(height: 8),
-          TigerButton(
-            label: roomState.hasVvipRoomAccess
-                ? 'VVIP ROOM'
-                : roomState.hasVipRoomAccess
-                    ? 'VIP ROOM'
-                    : 'PRIVATE ROOMS',
-            icon: roomState.hasVvipRoomAccess
-                ? Icons.auto_awesome
-                : roomState.hasVipRoomAccess
-                    ? Icons.diamond
-                    : Icons.meeting_room,
-            secondary: true,
-            onPressed: () => VipRoomsSheet.show(context),
-          ),
-          const SizedBox(height: 8),
-          TigerButton(
-            label: 'PASS THE GLASS',
-            icon: Icons.local_bar,
-            secondary: true,
-            onPressed: onPassGlass,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -251,7 +380,7 @@ class _TabBar extends StatelessWidget {
   final ValueChanged<LoungeTab> onChanged;
 
   static const _items = [
-    (LoungeTab.challenges, Icons.emoji_events, 'CHALLENGE'),
+    (LoungeTab.challenges, Icons.emoji_events, 'EARN'),
     (LoungeTab.games, Icons.grid_view, 'PLAY'),
     (LoungeTab.social, Icons.people, 'FEED'),
     (LoungeTab.menu, Icons.auto_awesome, 'MENU'),

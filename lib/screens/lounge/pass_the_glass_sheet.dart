@@ -48,6 +48,7 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
   }
 
   Future<void> _raise() async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -68,6 +69,7 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
   }
 
   Future<void> _tip() async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -97,6 +99,7 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
   }
 
   Future<void> _claim() async {
+    if (_busy) return;
     final code = _codeController.text.trim();
     if (code.isEmpty) {
       setState(() => _error = 'Enter a glass code like GLASS-A1B2');

@@ -5,35 +5,18 @@ import WidgetKit
 @main
 struct BlindTigerWidgets: WidgetBundle {
   var body: some Widget {
-    if #available(iOS 16.1, *) {
+    if #available(iOSApplicationExtension 18.0, *) {
       BlindTigerTimeActivity()
     }
   }
 }
-
-/// Must be named exactly `LiveActivitiesAppAttributes` for the live_activities plugin.
-struct LiveActivitiesAppAttributes: ActivityAttributes, Identifiable {
-  public typealias LiveDeliveryData = ContentState
-
-  public struct ContentState: Codable, Hashable {}
-
-  var id = UUID()
-}
-
-extension LiveActivitiesAppAttributes {
-  func prefixedKey(_ key: String) -> String {
-    "\(id)_\(key)"
-  }
-}
-
-let sharedDefault = UserDefaults(suiteName: "group.com.intime.inTimeBartender")!
 
 /// In Time neon green — timer digits only.
 private let timerNeon = Color(red: 0.224, green: 1.0, blue: 0.078) // #39FF14
 private let timerNeonGlow = Color(red: 0.0, green: 0.902, blue: 0.463) // #00E676
 private let timerUrgent = Color(red: 1.0, green: 0.231, blue: 0.231) // #FF3B3B
 
-@available(iOSApplicationExtension 16.1, *)
+@available(iOSApplicationExtension 18.0, *)
 struct BlindTigerTimeActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: LiveActivitiesAppAttributes.self) { context in
@@ -47,9 +30,9 @@ struct BlindTigerTimeActivity: Widget {
               .font(.system(size: 9, weight: .bold))
               .foregroundStyle(Color(red: 0.83, green: 0.69, blue: 0.36))
               .tracking(1.2)
-            Text(data.status)
+            Text(data.hasSocialAlert ? data.socialAlertTitle : data.status)
               .font(.system(size: 12, weight: .semibold))
-              .foregroundStyle(.white.opacity(0.85))
+              .foregroundStyle(data.hasSocialAlert ? timerUrgent : .white.opacity(0.85))
               .lineLimit(1)
               .minimumScaleFactor(0.8)
           }
@@ -59,35 +42,49 @@ struct BlindTigerTimeActivity: Widget {
             .frame(minWidth: 96, alignment: .trailing)
         }
         DynamicIslandExpandedRegion(.bottom) {
-          HStack {
-            Text(data.member)
-              .font(.system(size: 12, weight: .medium))
-              .foregroundStyle(.white.opacity(0.8))
-              .lineLimit(1)
-            Spacer()
-            Text(data.branch)
-              .font(.system(size: 11, weight: .regular))
-              .foregroundStyle(.white.opacity(0.55))
-              .lineLimit(1)
+          if data.hasSocialAlert {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(data.socialAlertSender.isEmpty ? data.member : data.socialAlertSender)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+              Text(data.socialAlertBody)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(.white.opacity(0.7))
+                .lineLimit(2)
+            }
+            .padding(.top, 2)
+          } else {
+            HStack {
+              Text(data.member)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .lineLimit(1)
+              Spacer()
+              Text(data.branch)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(1)
+            }
+            .padding(.top, 2)
           }
-          .padding(.top, 2)
         }
       } compactLeading: {
-        Image(systemName: "clock.fill")
+        // Apple Watch Smart Stack defaults to compact leading+trailing when
+        // supplementalActivityFamilies is not used; keep these glanceable.
+        Image(systemName: data.hasSocialAlert ? "bell.fill" : "clock.fill")
           .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(timerNeon)
+          .foregroundStyle(data.hasSocialAlert ? timerUrgent : timerNeon)
       } compactTrailing: {
-        // Apple Watch Smart Stack defaults to compact leading+trailing.
-        // Fixed 52pt was clipping HH:MM:SS — let digits scale to fit.
         CountdownText(data: data, size: 13)
           .frame(minWidth: 70, maxWidth: 84, alignment: .trailing)
       } minimal: {
-        Image(systemName: "clock.fill")
-          .foregroundStyle(timerNeon)
+        Image(systemName: data.hasSocialAlert ? "bell.fill" : "clock.fill")
+          .foregroundStyle(data.hasSocialAlert ? timerUrgent : timerNeon)
       }
       .keylineTint(timerNeon)
     }
-    .blindTigerWatchFamilies()
+    .supplementalActivityFamilies([.small])
   }
 }
 
@@ -111,9 +108,11 @@ private struct TimeBannerAdaptive: View {
   @Environment(\.activityFamily) private var activityFamily
 
   var body: some View {
-    if activityFamily == .small {
+    // activityFamily must be read on a View (not the Widget) — see Apple forums.
+    switch activityFamily {
+    case .small:
       WatchSmartStackView(data: data)
-    } else {
+    default:
       PhoneLockScreenView(data: data)
     }
   }
@@ -130,15 +129,21 @@ private struct PhoneLockScreenView: View {
           .font(.system(size: 10, weight: .bold))
           .foregroundStyle(Color(red: 0.83, green: 0.69, blue: 0.36))
           .tracking(1.2)
-        Text(data.status)
+        Text(data.hasSocialAlert ? data.socialAlertTitle : data.status)
           .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(.white)
+          .foregroundStyle(data.hasSocialAlert ? timerUrgent : .white)
           .lineLimit(1)
           .minimumScaleFactor(0.8)
-        Text("\(data.member) · \(data.branch)")
+        Text(
+          data.hasSocialAlert
+            ? (data.socialAlertBody.isEmpty
+              ? "\(data.socialAlertSender) · \(data.branch)"
+              : data.socialAlertBody)
+            : "\(data.member) · \(data.branch)"
+        )
           .font(.system(size: 11))
           .foregroundStyle(.white.opacity(0.65))
-          .lineLimit(1)
+          .lineLimit(2)
           .minimumScaleFactor(0.75)
       }
       .layoutPriority(0)
@@ -169,26 +174,25 @@ private struct WatchSmartStackView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 5) {
-        Image(systemName: "clock.fill")
+        Image(systemName: data.hasSocialAlert ? "bell.fill" : "clock.fill")
           .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(timerNeon)
+          .foregroundStyle(data.hasSocialAlert ? timerUrgent : timerNeon)
         Text("BLIND TIGER")
           .font(.system(size: 10, weight: .bold))
           .foregroundStyle(Color(red: 0.83, green: 0.69, blue: 0.36))
         Spacer(minLength: 0)
-        Text(data.status)
+        Text(data.hasSocialAlert ? data.socialAlertTitle : data.status)
           .font(.system(size: 9, weight: .semibold))
-          .foregroundStyle(.white.opacity(0.7))
+          .foregroundStyle(data.hasSocialAlert ? timerUrgent : .white.opacity(0.7))
           .lineLimit(1)
           .minimumScaleFactor(0.7)
       }
 
-      // Full-width countdown — hero on Watch, no clipping frame.
-      CountdownText(data: data, size: 36)
+      CountdownText(data: data, size: 28)
         .frame(maxWidth: .infinity, alignment: .leading)
         .layoutPriority(1)
 
-      Text(data.member)
+      Text(data.hasSocialAlert && !data.socialAlertSender.isEmpty ? data.socialAlertSender : data.member)
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(.white.opacity(0.75))
         .lineLimit(1)
@@ -213,9 +217,11 @@ private struct CountdownText: View {
   var body: some View {
     Group {
       if data.useLiveCountdown {
+        // System-rendered countdown — advances on Lock Screen / Island / Watch
+        // without waking the app. Do NOT substitute with a static remainingLabel here.
         Text(timerInterval: data.range, countsDown: true, showsHours: true)
       } else {
-        // Large wallets (e.g. 423h) — show exact label, not a capped countdown.
+        // Huge wallets only (>36h): label is accurate but refreshes only on Activity sync.
         Text(data.remainingLabel)
       }
     }
@@ -223,8 +229,7 @@ private struct CountdownText: View {
     .font(.system(size: size, weight: .bold, design: .rounded))
     .foregroundStyle(color)
     .shadow(color: color.opacity(0.95), radius: 1)
-    .shadow(color: color.opacity(0.7), radius: 6)
-    .shadow(color: color.opacity(0.35), radius: 14)
+    .shadow(color: color.opacity(0.55), radius: 5)
     .multilineTextAlignment(.trailing)
     .lineLimit(1)
     .minimumScaleFactor(0.5)
@@ -241,36 +246,60 @@ private struct TimeActivityData {
   let urgent: Bool
   let useLiveCountdown: Bool
   let remainingLabel: String
+  let hasSocialAlert: Bool
+  let socialAlertTitle: String
+  let socialAlertBody: String
+  let socialAlertSender: String
 
   init(context: ActivityViewContext<LiveActivitiesAppAttributes>) {
-    let defaults = sharedDefault
+    let state = context.state
+    let defaults = UserDefaults(suiteName: state.appGroupId) ?? sharedDefault
     let prefix = context.attributes.prefixedKey
-    member = defaults.string(forKey: prefix("memberName")) ?? "Guest"
-    branch = defaults.string(forKey: prefix("branch")) ?? "Club"
-    status = defaults.string(forKey: prefix("status")) ?? "INSIDE"
-    let startMs = defaults.double(forKey: prefix("timerStartMs"))
-    let endMs = defaults.double(forKey: prefix("timerEndMs"))
-    let start = Date(timeIntervalSince1970: (startMs > 0 ? startMs : Date().timeIntervalSince1970 * 1000) / 1000)
-    let end = Date(timeIntervalSince1970: (endMs > 0 ? endMs : Date().timeIntervalSince1970 * 1000) / 1000)
-    range = start...max(start.addingTimeInterval(1), end)
-    urgent = defaults.bool(forKey: prefix("urgent"))
-    // Default true only when key missing AND duration is short — prefer label if unsure.
-    if defaults.object(forKey: prefix("useLiveCountdown")) != nil {
-      useLiveCountdown = defaults.bool(forKey: prefix("useLiveCountdown"))
-    } else {
-      useLiveCountdown = end.timeIntervalSince(start) <= (36 * 3600)
-    }
-    remainingLabel = defaults.string(forKey: prefix("remainingLabel")) ?? "—"
-  }
-}
 
-private extension WidgetConfiguration {
-  /// Opt into Apple Watch / CarPlay small family when the OS supports it.
-  func blindTigerWatchFamilies() -> some WidgetConfiguration {
-    if #available(iOSApplicationExtension 18.0, *) {
-      return supplementalActivityFamilies([.small])
-    } else {
-      return self
+    func string(_ stateValue: String?, _ key: String, fallback: String) -> String {
+      if let stateValue, !stateValue.isEmpty { return stateValue }
+      return defaults.string(forKey: prefix(key)) ?? fallback
     }
+
+    member = string(state.memberName, "memberName", fallback: "Guest")
+    branch = string(state.branch, "branch", fallback: "Club")
+    status = string(state.status, "status", fallback: "INSIDE")
+
+    // ContentState is authoritative (Watch cannot read App Group). App Group is fallback
+    // for older activities that only carried appGroupId.
+    let startMs: Double = {
+      if state.timerStartMs > 0 { return state.timerStartMs }
+      let fallback = defaults.double(forKey: prefix("timerStartMs"))
+      return fallback > 0 ? fallback : Date().timeIntervalSince1970 * 1000
+    }()
+    let endMs: Double = {
+      if state.timerEndMs > startMs { return state.timerEndMs }
+      let fallback = defaults.double(forKey: prefix("timerEndMs"))
+      return fallback > startMs ? fallback : startMs + 1000
+    }()
+    // Prefer ContentState.timerRange when dates are already coherent.
+    if state.timerStartMs > 0, state.timerEndMs > state.timerStartMs {
+      range = state.timerRange
+    } else {
+      let start = Date(timeIntervalSince1970: startMs / 1000)
+      let end = Date(timeIntervalSince1970: endMs / 1000)
+      range = start...max(start.addingTimeInterval(1), end)
+    }
+
+    let duration = range.upperBound.timeIntervalSince(range.lowerBound)
+    let liveMax = BlindTigerLiveActivityConstants.liveCountdownMaxSeconds
+    // Force live countdown for package-length ranges even if a prior huge-wallet sync
+    // left useLiveCountdown=false in App Group / ContentState.
+    useLiveCountdown = duration > 1 && duration <= liveMax
+
+    urgent = state.urgent || defaults.bool(forKey: prefix("urgent"))
+    remainingLabel = {
+      if !state.remainingLabel.isEmpty { return state.remainingLabel }
+      return defaults.string(forKey: prefix("remainingLabel")) ?? "—"
+    }()
+    hasSocialAlert = state.hasSocialAlert || defaults.bool(forKey: prefix("hasSocialAlert"))
+    socialAlertTitle = string(state.socialAlertTitle, "socialAlertTitle", fallback: "")
+    socialAlertBody = string(state.socialAlertBody, "socialAlertBody", fallback: "")
+    socialAlertSender = string(state.socialAlertSender, "socialAlertSender", fallback: "")
   }
 }

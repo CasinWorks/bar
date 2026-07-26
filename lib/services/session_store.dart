@@ -35,14 +35,16 @@ class SessionStore extends SessionStoreDelegate {
   ClubSessionRecord? getSession(String id) => _delegate.getSession(id);
 
   @override
-  Future<ClubSessionRecord?> fetchSession(String id) => _delegate.fetchSession(id);
+  Future<ClubSessionRecord?> fetchSession(String id) =>
+      _delegate.fetchSession(id);
 
   @override
   Future<ClubSessionRecord?> fetchSessionFresh(String id) =>
       _delegate.fetchSessionFresh(id);
 
   @override
-  Future<ClubSessionRecord?> findByCode(String code) => _delegate.findByCode(code);
+  Future<ClubSessionRecord?> findByCode(String code) =>
+      _delegate.findByCode(code);
 
   @override
   List<ClubSessionRecord> get activeSessions => _delegate.activeSessions;
@@ -52,30 +54,40 @@ class SessionStore extends SessionStoreDelegate {
       _delegate.fetchActiveSessionForMember(memberId);
 
   @override
+  Future<int> completeStaleSessions({String? memberId}) =>
+      _delegate.completeStaleSessions(memberId: memberId);
+
+  @override
   Future<void> upsert(ClubSessionRecord session) => _delegate.upsert(session);
 
   @override
-  Future<void> confirmEntry(String sessionId) => _delegate.confirmEntry(sessionId);
+  Future<void> confirmEntry(String sessionId) =>
+      _delegate.confirmEntry(sessionId);
 
   @override
-  Future<void> requestExit(String sessionId) => _delegate.requestExit(sessionId);
+  Future<void> requestExit(String sessionId) =>
+      _delegate.requestExit(sessionId);
 
   @override
-  Future<void> cancelExitRequest(String sessionId) => _delegate.cancelExitRequest(sessionId);
+  Future<void> cancelExitRequest(String sessionId) =>
+      _delegate.cancelExitRequest(sessionId);
 
   @override
-  Future<void> confirmExit(String sessionId) => _delegate.confirmExit(sessionId);
+  Future<void> confirmExit(String sessionId) =>
+      _delegate.confirmExit(sessionId);
 
   @override
   Future<void> updateRemaining(String sessionId, int seconds) =>
       _delegate.updateRemaining(sessionId, seconds);
 
   @override
-  Future<void> cancelSession(String sessionId) => _delegate.cancelSession(sessionId);
+  Future<void> cancelSession(String sessionId) =>
+      _delegate.cancelSession(sessionId);
 
   @override
   void addListener(void Function() listener) => _delegate.addListener(listener);
 
   @override
-  void removeListener(void Function() listener) => _delegate.removeListener(listener);
+  void removeListener(void Function() listener) =>
+      _delegate.removeListener(listener);
 }

@@ -73,6 +73,8 @@ class TimePackage {
     required this.label,
     required this.tagline,
     this.popular = false,
+    this.pricePeso,
+    this.includedDrinks,
   });
 
   final String id;
@@ -80,8 +82,10 @@ class TimePackage {
   final String label;
   final String tagline;
   final bool popular;
+  final int? pricePeso;
+  final int? includedDrinks;
 
-  int get price => minutes * AppTimePricing.pesoPerMinute;
+  int get price => pricePeso ?? minutes * AppTimePricing.pesoPerMinute;
   int get discountedPrice => (price * 0.85).floor();
 }
 
@@ -104,6 +108,7 @@ class Challenge {
     required this.targetCount,
     this.currentCount = 0,
     required this.points,
+    this.bonusMinutes = 0,
     this.claimed = false,
     required this.category,
   });
@@ -114,6 +119,8 @@ class Challenge {
   final int targetCount;
   int currentCount;
   final int points;
+  /// Minutes credited to wallet on claim (Club District earn model).
+  final int bonusMinutes;
   bool claimed;
   final ChallengeCategory category;
 
@@ -130,6 +137,7 @@ class Challenge {
       targetCount: targetCount,
       currentCount: currentCount ?? this.currentCount,
       points: points,
+      bonusMinutes: bonusMinutes,
       claimed: claimed ?? this.claimed,
       category: category,
     );
@@ -245,6 +253,8 @@ extension DrinkCategoryLabel on DrinkCategory {
       };
 }
 
+enum DrinkKind { standard, premium }
+
 class Drink {
   const Drink({
     required this.id,
@@ -260,6 +270,7 @@ class Drink {
     required this.imageColorStart,
     required this.imageColorEnd,
     required this.timeCostSeconds,
+    this.kind = DrinkKind.premium,
   });
 
   final String id;
@@ -274,7 +285,12 @@ class Drink {
   final String bartenderQuote;
   final int imageColorStart;
   final int imageColorEnd;
+  /// Premium path: burn minutes. Standard path: uses package allowance.
   final int timeCostSeconds;
+  final DrinkKind kind;
+
+  bool get isStandard => kind == DrinkKind.standard;
+  bool get isPremium => kind == DrinkKind.premium;
 }
 
 class MiniGame {

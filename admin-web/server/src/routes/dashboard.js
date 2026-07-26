@@ -4,6 +4,18 @@ import { requireAdmin, requireAdminOnly } from '../middleware/auth.js';
 
 const router = Router();
 
+async function safeCount(table, build = (q) => q) {
+  const { count, error } = await build(
+    supabaseAdmin.from(table).select('*', { count: 'exact', head: true }),
+  );
+  if (error) {
+    const message = `${error.message || ''} ${error.details || ''}`;
+    if (error.code === '42P01' || message.includes('does not exist')) return 0;
+    throw error;
+  }
+  return count ?? 0;
+}
+
 router.get('/me', requireAdmin, (req, res) => {
   res.json({ user: req.user, profile: req.profile });
 });
@@ -19,6 +31,9 @@ router.get('/stats', requireAdmin, async (req, res) => {
       { count: staffCount },
       { data: loadsToday },
       { data: upcomingEvents },
+      safetyReports,
+      rideRequests,
+      staleSessions,
     ] = await Promise.all([
       supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'member'),
       supabaseAdmin
@@ -36,6 +51,13 @@ router.get('/stats', requireAdmin, async (req, res) => {
         .gte('starts_at', new Date().toISOString())
         .order('starts_at', { ascending: true })
         .limit(5),
+      safeCount('safety_reports', (q) => q.eq('status', 'open')),
+      safeCount('ride_assist_requests', (q) => q.in('status', ['pending', 'staff_notified'])),
+      safeCount('club_sessions', (q) =>
+        q
+          .in('phase', ['inside_club', 'awaiting_exit_scan'])
+          .lte('entered_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()),
+      ),
     ]);
 
     const postedToday = (loadsToday ?? []).filter((r) => (r.status ?? 'posted') === 'posted');
@@ -49,6 +71,9 @@ router.get('/stats', requireAdmin, async (req, res) => {
       cashToday,
       minutesLoadedToday: Math.round(minutesToday),
       loadsTodayCount: postedToday.length,
+      safetyReports,
+      rideRequests,
+      staleSessions,
       upcomingEvents: upcomingEvents ?? [],
     });
   } catch (e) {

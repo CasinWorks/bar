@@ -7,7 +7,7 @@ import '../../models/blind_tiger_models.dart';
 import '../../models/club_session.dart';
 import '../../providers/app_state.dart';
 
-class DrinkDetailSheet extends StatelessWidget {
+class DrinkDetailSheet extends StatefulWidget {
   const DrinkDetailSheet({super.key, required this.drink});
 
   final Drink drink;
@@ -26,11 +26,103 @@ class DrinkDetailSheet extends StatelessWidget {
   }
 
   @override
+  State<DrinkDetailSheet> createState() => _DrinkDetailSheetState();
+}
+
+class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
+  bool _ordering = false;
+  String? _error;
+
+  Drink get drink => widget.drink;
+
+  Future<void> _order({required bool payWithCash}) async {
+    if (_ordering) return;
+    final appState = context.read<AppState>();
+    if (appState.isWalletBusy) {
+      setState(() => _error = 'Hang on — another order is still processing.');
+      return;
+    }
+
+    setState(() {
+      _ordering = true;
+      _error = null;
+    });
+
+    final beforeSeconds = appState.spendableTimeSeconds;
+    final beforeDrinks = appState.drinksAllowanceRemaining;
+    final ok = await appState.orderDrink(drink, payWithCash: payWithCash);
+
+    if (!mounted) return;
+
+    if (!ok) {
+      setState(() {
+        _ordering = false;
+        _error = payWithCash
+            ? 'Could not place cash order. Try again.'
+            : drink.isStandard
+                ? 'No package drinks left — or order failed.'
+                : 'Not enough time — or order failed. Try again.';
+      });
+      return;
+    }
+
+    final afterSeconds = context.read<AppState>().spendableTimeSeconds;
+    final afterDrinks = context.read<AppState>().drinksAllowanceRemaining;
+
+    if (!payWithCash && !drink.isStandard) {
+      await TimeRefillOverlay.show(
+        context,
+        fromSeconds: beforeSeconds,
+        toSeconds: afterSeconds,
+        title: 'ROUND POURED',
+        subtitle: '${drink.name} · −${drink.timeCostSeconds ~/ 60} min',
+      );
+    } else if (drink.isStandard) {
+      await TimeRefillOverlay.show(
+        context,
+        fromSeconds: beforeSeconds,
+        toSeconds: afterSeconds,
+        title: 'ROUND POURED',
+        subtitle: '${drink.name} · package drink ($afterDrinks left, was $beforeDrinks)',
+      );
+    }
+
+    if (!mounted) return;
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          payWithCash
+              ? '${drink.name} — settle at the bar.'
+              : '${drink.name} ordered!',
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final canOrder = state.sessionPhase == SessionPhase.insideClub &&
-        state.canSpendTime &&
+    final inside = state.sessionPhase == SessionPhase.insideClub;
+    final canPackage = inside &&
+        drink.isStandard &&
+        state.drinksAllowanceRemaining > 0;
+    final canMinutes = inside &&
+        !drink.isStandard &&
         state.spendableTimeSeconds >= drink.timeCostSeconds;
+    final canCash = inside && !drink.isStandard;
+    final blocked = _ordering || state.isWalletBusy;
+
+    String primaryLabel;
+    if (!inside) {
+      primaryLabel = 'ENTER CLUB FIRST';
+    } else if (drink.isStandard) {
+      primaryLabel = canPackage ? 'ORDER (PACKAGE)' : 'NO DRINKS LEFT';
+    } else if (canMinutes) {
+      primaryLabel = 'ORDER (−${drink.timeCostSeconds ~/ 60} MIN)';
+    } else {
+      primaryLabel = 'NOT ENOUGH TIME';
+    }
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -117,41 +209,53 @@ class DrinkDetailSheet extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(drink.price, style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.goldBright)),
                 Text(
-                  '-${drink.timeCostSeconds ~/ 60} min',
-                  style: const TextStyle(color: AppColors.dangerRed, fontWeight: FontWeight.bold),
+                  drink.price,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AppColors.tigerRed,
+                      ),
+                ),
+                Text(
+                  drink.isStandard
+                      ? 'Uses 1 package drink · ${state.drinksAllowanceRemaining} left'
+                      : '−${drink.timeCostSeconds ~/ 60} min · or pay at bar',
+                  style: TextStyle(
+                    color: drink.isStandard
+                        ? AppColors.timerHealthy
+                        : AppColors.tigerRed,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.tigerOrange, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 16),
             TigerButton(
-              label: canOrder ? 'ORDER NOW' : 'NOT ENOUGH TIME',
+              label: primaryLabel,
               icon: Icons.local_bar,
-              onPressed: canOrder
-                  ? () async {
-                      final appState = context.read<AppState>();
-                      final beforeSeconds = appState.spendableTimeSeconds;
-                      final ok = await appState.orderDrink(drink);
-                      if (!context.mounted || !ok) return;
-
-                      final afterSeconds = context.read<AppState>().spendableTimeSeconds;
-                      await TimeRefillOverlay.show(
-                        context,
-                        fromSeconds: beforeSeconds,
-                        toSeconds: afterSeconds,
-                        title: 'ROUND POURED',
-                        subtitle: '${drink.name} · −${drink.timeCostSeconds ~/ 60} min',
-                      );
-
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${drink.name} ordered!')),
-                      );
-                    }
+              isLoading: _ordering,
+              onPressed: (!blocked && (canPackage || canMinutes))
+                  ? () => _order(payWithCash: false)
                   : null,
             ),
+            if (!drink.isStandard) ...[
+              const SizedBox(height: 8),
+              TigerButton(
+                label: 'PAY AT BAR (CASH)',
+                secondary: true,
+                isLoading: _ordering,
+                onPressed: (!blocked && canCash)
+                    ? () => _order(payWithCash: true)
+                    : null,
+              ),
+            ],
           ],
         ),
       ),

@@ -16,38 +16,15 @@ class SocialPlayException implements Exception {
 class SocialPlayService {
   SocialPlayService();
 
+  static const presenceFreshness = Duration(seconds: 90);
+
   bool get usesCloud => SupabaseConfig.isConfigured;
 
-  SupabaseClient? get _client =>
-      usesCloud ? Supabase.instance.client : null;
+  SupabaseClient? get _client => usesCloud ? Supabase.instance.client : null;
 
   final Map<String, SocialPresence> _localPresence = {};
   final Map<String, SocialMeet> _localMeets = {};
   final _rng = Random();
-
-  static const _ambientGuests = [
-    SocialPresence(
-      memberId: 'ambient-lexi',
-      displayName: 'Lexi',
-      branch: '',
-      vibeTag: 'Jazz · First night',
-      openToMeet: true,
-    ),
-    SocialPresence(
-      memberId: 'ambient-marco',
-      displayName: 'Marco',
-      branch: '',
-      vibeTag: 'Down for a duel',
-      openToMeet: true,
-    ),
-    SocialPresence(
-      memberId: 'ambient-sasha',
-      displayName: 'Sasha',
-      branch: '',
-      vibeTag: 'Looking for a toast',
-      openToMeet: true,
-    ),
-  ];
 
   Future<SocialPresence> setOpenToMeet({
     required bool open,
@@ -99,22 +76,16 @@ class SocialPlayService {
     String? selfId,
   }) async {
     if (!usesCloud) {
+      final cutoff = DateTime.now().subtract(presenceFreshness);
       final live = _localPresence.values
-          .where((p) => p.openToMeet && p.branch == branch)
-          .toList();
-      final ambient = _ambientGuests
-          .map(
-            (g) => SocialPresence(
-              memberId: g.memberId,
-              displayName: g.displayName,
-              branch: branch,
-              vibeTag: g.vibeTag,
-              openToMeet: true,
-            ),
+          .where(
+            (p) =>
+                p.openToMeet &&
+                p.branch == branch &&
+                (p.updatedAt == null || p.updatedAt!.isAfter(cutoff)),
           )
-          .where((g) => selfId == null || g.memberId != selfId)
           .toList();
-      return [...live, ...ambient];
+      return live.where((p) => selfId == null || p.memberId != selfId).toList();
     }
 
     try {
@@ -122,6 +93,7 @@ class SocialPlayService {
         'list_whos_inside',
         params: {'p_branch': branch},
       );
+      final cutoff = DateTime.now().subtract(presenceFreshness);
       final list = (rows as List)
           .map(
             (r) => SocialPresence.fromSupabaseRow(
@@ -129,36 +101,17 @@ class SocialPlayService {
             ),
           )
           .map((p) => p.copyWith(isSelf: p.memberId == selfId))
-          .toList();
-
-      // Soft-fill atmosphere when the room is quiet.
-      if (list.where((p) => !p.isSelf).length < 2) {
-        final extras = _ambientGuests
-            .take(2)
-            .map(
-              (g) => SocialPresence(
-                memberId: g.memberId,
-                displayName: g.displayName,
-                branch: branch,
-                vibeTag: g.vibeTag,
-                openToMeet: true,
-              ),
-            );
-        return [...list, ...extras];
-      }
-      return list;
-    } catch (_) {
-      return _ambientGuests
-          .map(
-            (g) => SocialPresence(
-              memberId: g.memberId,
-              displayName: g.displayName,
-              branch: branch,
-              vibeTag: g.vibeTag,
-              openToMeet: true,
-            ),
+          .where(
+            (p) =>
+                p.openToMeet &&
+                p.branch == branch &&
+                (p.updatedAt == null || p.updatedAt!.isAfter(cutoff)),
           )
           .toList();
+
+      return list;
+    } catch (_) {
+      return [];
     }
   }
 
@@ -344,10 +297,7 @@ class SocialPlayService {
     try {
       final row = await _client!.rpc(
         'submit_duo_score',
-        params: {
-          'p_meet_id': meetId,
-          'p_score': score,
-        },
+        params: {'p_meet_id': meetId, 'p_score': score},
       );
       return SocialMeet.fromSupabaseRow(Map<String, dynamic>.from(row as Map));
     } catch (e) {

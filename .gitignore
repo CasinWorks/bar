@@ -52,6 +52,10 @@ app.*.map.json
 **/.env.*
 !**/.env.example
 lib/core/config/supabase_secrets.dart
+**/firebase-service-account*.json
+**/*-firebase-adminsdk-*.json
+
+# Firebase client configs are OK to commit; service account JSON is not.
 
 # Admin web
 admin-web/**/node_modules/

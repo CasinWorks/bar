@@ -7,6 +7,8 @@ enum SessionPhase {
 }
 
 class ClubSessionRecord {
+  static const autoBadgeOutAfter = Duration(hours: 48);
+
   ClubSessionRecord({
     required this.id,
     required this.memberId,
@@ -17,6 +19,12 @@ class ClubSessionRecord {
     this.phase = SessionPhase.paidAwaitingEntry,
     this.remainingSeconds = 0,
     this.drinksOrdered = 0,
+    this.packageSlug,
+    this.includedDrinksRemaining = 0,
+    this.includedDrinksTotal = 0,
+    this.closingAt,
+    this.experiencesMinutesSpent = 0,
+    this.bonusMinutesEarned = 0,
     this.enteredAt,
     this.exitedAt,
   });
@@ -30,10 +38,36 @@ class ClubSessionRecord {
   SessionPhase phase;
   int remainingSeconds;
   int drinksOrdered;
+  String? packageSlug;
+  int includedDrinksRemaining;
+  int includedDrinksTotal;
+  DateTime? closingAt;
+  int experiencesMinutesSpent;
+  int bonusMinutesEarned;
   DateTime? enteredAt;
   DateTime? exitedAt;
 
-  String get displayCode => id.replaceAll('-', '').substring(0, 8).toUpperCase();
+  String get displayCode =>
+      id.replaceAll('-', '').substring(0, 8).toUpperCase();
+
+  DateTime? get autoBadgeOutAt =>
+      enteredAt?.add(ClubSessionRecord.autoBadgeOutAfter);
+
+  bool isAutoBadgeOutOverdue({DateTime? now}) {
+    final autoExit = autoBadgeOutAt;
+    if (autoExit == null) return false;
+    if (phase != SessionPhase.insideClub &&
+        phase != SessionPhase.awaitingExitScan) {
+      return false;
+    }
+    return !(now ?? DateTime.now()).isBefore(autoExit);
+  }
+
+  void applyAutoBadgeOut({DateTime? now}) {
+    if (!isAutoBadgeOutOverdue(now: now)) return;
+    phase = SessionPhase.completed;
+    exitedAt = autoBadgeOutAt ?? (now ?? DateTime.now());
+  }
 
   /// Prefer an in-club visit over a stale unpaid entry pass.
   static ClubSessionRecord? pickActiveForMember(
@@ -41,16 +75,18 @@ class ClubSessionRecord {
     String memberId,
   ) {
     final active = sessions
-        .where((s) => s.memberId == memberId && s.phase != SessionPhase.completed)
+        .where(
+          (s) => s.memberId == memberId && s.phase != SessionPhase.completed,
+        )
         .toList();
     if (active.isEmpty) return null;
 
     int priority(SessionPhase phase) => switch (phase) {
-          SessionPhase.insideClub => 0,
-          SessionPhase.awaitingExitScan => 1,
-          SessionPhase.paidAwaitingEntry => 2,
-          _ => 99,
-        };
+      SessionPhase.insideClub => 0,
+      SessionPhase.awaitingExitScan => 1,
+      SessionPhase.paidAwaitingEntry => 2,
+      _ => 99,
+    };
 
     active.sort((a, b) => priority(a.phase).compareTo(priority(b.phase)));
     return active.first;
@@ -87,18 +123,24 @@ class ClubSessionRecord {
   }
 
   Map<String, dynamic> toSupabaseRow() => {
-        'id': id,
-        'member_id': memberId,
-        'member_name': memberName,
-        'purchased_seconds': purchasedSeconds,
-        'amount_paid': amountPaid,
-        'branch': branch,
-        'phase': phaseToDb(phase),
-        'remaining_seconds': remainingSeconds,
-        'drinks_ordered': drinksOrdered,
-        'entered_at': enteredAt?.toUtc().toIso8601String(),
-        'exited_at': exitedAt?.toUtc().toIso8601String(),
-      };
+    'id': id,
+    'member_id': memberId,
+    'member_name': memberName,
+    'purchased_seconds': purchasedSeconds,
+    'amount_paid': amountPaid,
+    'branch': branch,
+    'phase': phaseToDb(phase),
+    'remaining_seconds': remainingSeconds,
+    'drinks_ordered': drinksOrdered,
+    'package_slug': packageSlug,
+    'included_drinks_remaining': includedDrinksRemaining,
+    'included_drinks_total': includedDrinksTotal,
+    'closing_at': closingAt?.toUtc().toIso8601String(),
+    'experiences_minutes_spent': experiencesMinutesSpent,
+    'bonus_minutes_earned': bonusMinutesEarned,
+    'entered_at': enteredAt?.toUtc().toIso8601String(),
+    'exited_at': exitedAt?.toUtc().toIso8601String(),
+  };
 
   factory ClubSessionRecord.fromSupabaseRow(Map<String, dynamic> json) {
     return ClubSessionRecord(
@@ -111,24 +153,36 @@ class ClubSessionRecord {
       phase: phaseFromDb(json['phase'] as String),
       remainingSeconds: json['remaining_seconds'] as int? ?? 0,
       drinksOrdered: json['drinks_ordered'] as int? ?? 0,
+      packageSlug: json['package_slug'] as String?,
+      includedDrinksRemaining: json['included_drinks_remaining'] as int? ?? 0,
+      includedDrinksTotal: json['included_drinks_total'] as int? ?? 0,
+      closingAt: _parseTimestamp(json['closing_at']),
+      experiencesMinutesSpent: json['experiences_minutes_spent'] as int? ?? 0,
+      bonusMinutesEarned: json['bonus_minutes_earned'] as int? ?? 0,
       enteredAt: _parseTimestamp(json['entered_at']),
       exitedAt: _parseTimestamp(json['exited_at']),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'memberId': memberId,
-        'memberName': memberName,
-        'purchasedSeconds': purchasedSeconds,
-        'amountPaid': amountPaid,
-        'branch': branch,
-        'phase': phase.name,
-        'remainingSeconds': remainingSeconds,
-        'drinksOrdered': drinksOrdered,
-        'enteredAt': enteredAt?.toUtc().toIso8601String(),
-        'exitedAt': exitedAt?.toUtc().toIso8601String(),
-      };
+    'id': id,
+    'memberId': memberId,
+    'memberName': memberName,
+    'purchasedSeconds': purchasedSeconds,
+    'amountPaid': amountPaid,
+    'branch': branch,
+    'phase': phase.name,
+    'remainingSeconds': remainingSeconds,
+    'drinksOrdered': drinksOrdered,
+    'packageSlug': packageSlug,
+    'includedDrinksRemaining': includedDrinksRemaining,
+    'includedDrinksTotal': includedDrinksTotal,
+    'closingAt': closingAt?.toUtc().toIso8601String(),
+    'experiencesMinutesSpent': experiencesMinutesSpent,
+    'bonusMinutesEarned': bonusMinutesEarned,
+    'enteredAt': enteredAt?.toUtc().toIso8601String(),
+    'exitedAt': exitedAt?.toUtc().toIso8601String(),
+  };
 
   factory ClubSessionRecord.fromJson(Map<String, dynamic> json) {
     return ClubSessionRecord(
@@ -141,6 +195,12 @@ class ClubSessionRecord {
       phase: SessionPhase.values.byName(json['phase'] as String),
       remainingSeconds: json['remainingSeconds'] as int? ?? 0,
       drinksOrdered: json['drinksOrdered'] as int? ?? 0,
+      packageSlug: json['packageSlug'] as String?,
+      includedDrinksRemaining: json['includedDrinksRemaining'] as int? ?? 0,
+      includedDrinksTotal: json['includedDrinksTotal'] as int? ?? 0,
+      closingAt: _parseTimestamp(json['closingAt']),
+      experiencesMinutesSpent: json['experiencesMinutesSpent'] as int? ?? 0,
+      bonusMinutesEarned: json['bonusMinutesEarned'] as int? ?? 0,
       enteredAt: _parseTimestamp(json['enteredAt']),
       exitedAt: _parseTimestamp(json['exitedAt']),
     );
@@ -155,7 +215,8 @@ class ClubSessionRecord {
     if (value == null) return null;
     if (value is! String || value.isEmpty) return null;
     final s = value.trim();
-    final hasZone = s.endsWith('Z') ||
+    final hasZone =
+        s.endsWith('Z') ||
         RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(s) ||
         RegExp(r'[+-]\d{4}$').hasMatch(s);
     final parsed = DateTime.parse(hasZone ? s : '${s}Z');
@@ -191,6 +252,12 @@ class ClubSessionRecord {
     int? purchasedSeconds,
     int? amountPaid,
     int? drinksOrdered,
+    String? packageSlug,
+    int? includedDrinksRemaining,
+    int? includedDrinksTotal,
+    DateTime? closingAt,
+    int? experiencesMinutesSpent,
+    int? bonusMinutesEarned,
     DateTime? enteredAt,
     DateTime? exitedAt,
   }) {
@@ -204,6 +271,14 @@ class ClubSessionRecord {
       phase: phase ?? this.phase,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       drinksOrdered: drinksOrdered ?? this.drinksOrdered,
+      packageSlug: packageSlug ?? this.packageSlug,
+      includedDrinksRemaining:
+          includedDrinksRemaining ?? this.includedDrinksRemaining,
+      includedDrinksTotal: includedDrinksTotal ?? this.includedDrinksTotal,
+      closingAt: closingAt ?? this.closingAt,
+      experiencesMinutesSpent:
+          experiencesMinutesSpent ?? this.experiencesMinutesSpent,
+      bonusMinutesEarned: bonusMinutesEarned ?? this.bonusMinutesEarned,
       enteredAt: enteredAt ?? this.enteredAt,
       exitedAt: exitedAt ?? this.exitedAt,
     );

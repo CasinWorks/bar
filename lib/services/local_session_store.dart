@@ -19,9 +19,15 @@ class LocalSessionStore extends SessionStoreDelegate {
     final map = jsonDecode(raw) as Map<String, dynamic>;
     _sessions
       ..clear()
-      ..addAll(map.map(
-        (k, v) => MapEntry(k, ClubSessionRecord.fromJson(v as Map<String, dynamic>)),
-      ));
+      ..addAll(
+        map.map(
+          (k, v) => MapEntry(
+            k,
+            ClubSessionRecord.fromJson(v as Map<String, dynamic>),
+          ),
+        ),
+      );
+    await completeStaleSessions();
     notifyListeners();
   }
 
@@ -32,16 +38,26 @@ class LocalSessionStore extends SessionStoreDelegate {
   void unsubscribe() {}
 
   @override
-  ClubSessionRecord? getSession(String id) => _sessions[id];
+  ClubSessionRecord? getSession(String id) {
+    _completeStaleSessionsSync();
+    return _sessions[id];
+  }
 
   @override
-  Future<ClubSessionRecord?> fetchSession(String id) async => _sessions[id];
+  Future<ClubSessionRecord?> fetchSession(String id) async {
+    await completeStaleSessions();
+    return _sessions[id];
+  }
 
   @override
-  Future<ClubSessionRecord?> fetchSessionFresh(String id) async => _sessions[id];
+  Future<ClubSessionRecord?> fetchSessionFresh(String id) async {
+    await completeStaleSessions();
+    return _sessions[id];
+  }
 
   @override
   Future<ClubSessionRecord?> findByCode(String code) async {
+    await completeStaleSessions();
     final upper = code.trim().toUpperCase();
     for (final s in _sessions.values) {
       if (s.displayCode == upper) return s;
@@ -50,16 +66,34 @@ class LocalSessionStore extends SessionStoreDelegate {
   }
 
   @override
-  List<ClubSessionRecord> get activeSessions => _sessions.values
-      .where((s) =>
-          s.phase == SessionPhase.paidAwaitingEntry ||
-          s.phase == SessionPhase.insideClub ||
-          s.phase == SessionPhase.awaitingExitScan)
-      .toList();
+  List<ClubSessionRecord> get activeSessions {
+    _completeStaleSessionsSync();
+    return _sessions.values
+        .where(
+          (s) =>
+              s.phase == SessionPhase.paidAwaitingEntry ||
+              s.phase == SessionPhase.insideClub ||
+              s.phase == SessionPhase.awaitingExitScan,
+        )
+        .toList();
+  }
 
   @override
-  Future<ClubSessionRecord?> fetchActiveSessionForMember(String memberId) async {
+  Future<ClubSessionRecord?> fetchActiveSessionForMember(
+    String memberId,
+  ) async {
+    await completeStaleSessions(memberId: memberId);
     return ClubSessionRecord.pickActiveForMember(_sessions.values, memberId);
+  }
+
+  @override
+  Future<int> completeStaleSessions({String? memberId}) async {
+    final count = _completeStaleSessionsSync(memberId: memberId);
+    if (count > 0) {
+      await _persist();
+      notifyListeners();
+    }
+    return count;
   }
 
   @override
@@ -72,7 +106,9 @@ class LocalSessionStore extends SessionStoreDelegate {
   @override
   Future<void> confirmEntry(String sessionId) async {
     final session = _sessions[sessionId];
-    if (session == null || session.phase != SessionPhase.paidAwaitingEntry) return;
+    if (session == null || session.phase != SessionPhase.paidAwaitingEntry) {
+      return;
+    }
 
     session.phase = SessionPhase.insideClub;
     session.enteredAt = DateTime.now();
@@ -93,7 +129,9 @@ class LocalSessionStore extends SessionStoreDelegate {
   @override
   Future<void> cancelExitRequest(String sessionId) async {
     final session = _sessions[sessionId];
-    if (session == null || session.phase != SessionPhase.awaitingExitScan) return;
+    if (session == null || session.phase != SessionPhase.awaitingExitScan) {
+      return;
+    }
 
     session.phase = SessionPhase.insideClub;
     await _persist();
@@ -103,7 +141,9 @@ class LocalSessionStore extends SessionStoreDelegate {
   @override
   Future<void> confirmExit(String sessionId) async {
     final session = _sessions[sessionId];
-    if (session == null || session.phase != SessionPhase.awaitingExitScan) return;
+    if (session == null || session.phase != SessionPhase.awaitingExitScan) {
+      return;
+    }
 
     session.phase = SessionPhase.completed;
     session.exitedAt = DateTime.now();
@@ -130,6 +170,18 @@ class LocalSessionStore extends SessionStoreDelegate {
     session.exitedAt = DateTime.now();
     await _persist();
     notifyListeners();
+  }
+
+  int _completeStaleSessionsSync({String? memberId}) {
+    var count = 0;
+    final now = DateTime.now();
+    for (final session in _sessions.values) {
+      if (memberId != null && session.memberId != memberId) continue;
+      if (!session.isAutoBadgeOutOverdue(now: now)) continue;
+      session.applyAutoBadgeOut(now: now);
+      count++;
+    }
+    return count;
   }
 
   Future<void> _persist() async {

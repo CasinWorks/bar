@@ -35,6 +35,11 @@ class _SummaryScreenState extends State<SummaryScreen> {
         phase: SessionPhase.completed,
         remainingSeconds: live.remainingSeconds,
         drinksOrdered: live.drinksOrdered,
+        packageSlug: live.packageSlug,
+        includedDrinksRemaining: live.includedDrinksRemaining,
+        includedDrinksTotal: live.includedDrinksTotal,
+        experiencesMinutesSpent: live.experiencesMinutesSpent,
+        bonusMinutesEarned: live.bonusMinutesEarned,
         enteredAt: live.enteredAt,
         exitedAt: live.exitedAt,
       );
@@ -74,19 +79,18 @@ class _SummaryScreenState extends State<SummaryScreen> {
               children: [
                 const Icon(Icons.check_circle, color: AppColors.successGreen, size: 48),
                 const SizedBox(height: 12),
-                Text('CHECKOUT COMPLETE', style: Theme.of(context).textTheme.headlineLarge),
+                Text('HOW YOU SPENT YOUR NIGHT', style: Theme.of(context).textTheme.headlineLarge),
                 Text(
-                  'Thank you for visiting The Blind Tiger.',
+                  'Thank you for visiting Blind Tiger Club District.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 if (balance > 0) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '$balanceLabel saved to your time balance for your next visit.',
+                    '$balanceLabel saved for your next visit. Extend your time anytime.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.timerNeon,
+                          color: AppColors.timerHealthy,
                           fontSize: 11,
-                          shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.45),
                         ),
                     textAlign: TextAlign.center,
                   ),
@@ -98,8 +102,8 @@ class _SummaryScreenState extends State<SummaryScreen> {
                       children: [
                         _Row('Member', session.memberName),
                         _Row('Branch', session.branch),
-                        _Row('Pass', '${session.purchasedSeconds ~/ 60} minutes'),
-                        _Row('Paid', '₱${session.amountPaid}'),
+                        if (session.packageSlug != null)
+                          _Row('Package', session.packageSlug!),
                         _Row(
                           'Time remaining',
                           state.formatDuration(
@@ -109,6 +113,21 @@ class _SummaryScreenState extends State<SummaryScreen> {
                           ),
                         ),
                         _Row('Drinks ordered', '${session.drinksOrdered}'),
+                        if (session.includedDrinksTotal > 0)
+                          _Row(
+                            'Drinks left',
+                            '${session.includedDrinksRemaining} / ${session.includedDrinksTotal}',
+                          ),
+                        if (session.experiencesMinutesSpent > 0)
+                          _Row(
+                            'Experiences',
+                            '−${session.experiencesMinutesSpent} min',
+                          ),
+                        if (session.bonusMinutesEarned > 0)
+                          _Row(
+                            'Bonus earned',
+                            '+${session.bonusMinutesEarned} min',
+                          ),
                         if (session.enteredAt != null)
                           _Row('Entered', _formatTime(session.enteredAt!)),
                         if (session.exitedAt != null)
@@ -146,7 +165,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 ],
                 const SizedBox(height: 12),
                 Text(
-                  'Need more time? Ask the house to load minutes at the club.',
+                  'Need more time? Ask the house to load a package at the club.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
                   textAlign: TextAlign.center,
                 ),

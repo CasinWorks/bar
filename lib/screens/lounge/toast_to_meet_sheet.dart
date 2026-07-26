@@ -85,7 +85,9 @@ class _ToastToMeetSheetState extends State<ToastToMeetSheet>
       _busy = true;
       _error = null;
     });
-    final (meet, err) = await context.read<AppState>().raiseMeetToast(minutes: 2);
+    final (meet, err) = await context.read<AppState>().raiseMeetToast(
+      minutes: 2,
+    );
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -119,7 +121,9 @@ class _ToastToMeetSheetState extends State<ToastToMeetSheet>
         continue;
       }
       if (pad.kind != MeetKind.toast) {
-        setState(() => _error = 'That pad is for Duo Beat — open Duo Beat Sync.');
+        setState(
+          () => _error = 'That pad is for Duo Beat — open Duo Beat Sync.',
+        );
         continue;
       }
       setState(() => _busy = true);
@@ -202,7 +206,9 @@ class _ToastToMeetSheetState extends State<ToastToMeetSheet>
             const SizedBox(height: 6),
             Text(
               'Spend 2 minutes. Show or scan a Meet Pad — unlock an icebreaker.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -211,7 +217,10 @@ class _ToastToMeetSheetState extends State<ToastToMeetSheet>
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(color: AppColors.tigerOrange, fontSize: 11),
+                style: const TextStyle(
+                  color: AppColors.tigerOrange,
+                  fontSize: 11,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -279,7 +288,9 @@ class _ToastToMeetSheetState extends State<ToastToMeetSheet>
           Text(
             'Same energy as Tip Bar — no codes to type.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontSize: 10),
           ),
         ],
       ),
@@ -432,7 +443,8 @@ class _DuoBeatSheetState extends State<DuoBeatSheet>
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final meet = _meet ??
+    final meet =
+        _meet ??
         (state.activeMeet?.kind == MeetKind.duoBeat ? state.activeMeet : null);
     final height = MediaQuery.sizeOf(context).height * 0.88;
 
@@ -456,7 +468,9 @@ class _DuoBeatSheetState extends State<DuoBeatSheet>
             const SizedBox(height: 6),
             Text(
               'Stake 2 minutes. Show or scan a pad. Race to 8 taps.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -465,7 +479,10 @@ class _DuoBeatSheetState extends State<DuoBeatSheet>
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(color: AppColors.tigerOrange, fontSize: 11),
+                style: const TextStyle(
+                  color: AppColors.tigerOrange,
+                  fontSize: 11,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -492,7 +509,8 @@ class _DuoBeatSheetState extends State<DuoBeatSheet>
               icon: Icons.music_note,
               onPressed: () async {
                 await DuoBeatModal.show(context);
-                if (context.mounted) Navigator.pop(context);
+                if (!mounted) return;
+                Navigator.pop(context);
               },
             ),
             const Spacer(),
@@ -602,9 +620,7 @@ class _ShowPadView extends StatelessWidget {
           ),
         ),
         Text(
-          waiting
-              ? subtitle
-              : 'Matched with ${matchedName ?? 'guest'}',
+          waiting ? subtitle : 'Matched with ${matchedName ?? 'guest'}',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
         ),
@@ -612,7 +628,11 @@ class _ShowPadView extends StatelessWidget {
           const SizedBox(height: 8),
           const Text(
             'Waiting for a scan…',
-            style: TextStyle(color: AppColors.timerNeon, fontSize: 11, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: AppColors.timerNeon,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ],
@@ -657,7 +677,11 @@ class _ScanPadView extends StatelessWidget {
                 if (busy)
                   const ColoredBox(
                     color: Color(0x88000000),
-                    child: Center(child: CircularProgressIndicator(color: AppColors.timerNeon)),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.timerNeon,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -689,7 +713,9 @@ class _IcebreakerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final other = meet.hostId == selfId ? (meet.guestName ?? 'guest') : meet.hostName;
+    final other = meet.hostId == selfId
+        ? (meet.guestName ?? 'guest')
+        : meet.hostName;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -702,19 +728,23 @@ class _IcebreakerView extends StatelessWidget {
                 Text(
                   'ICEBREAKER',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontSize: 9,
-                        color: AppColors.goldBright,
-                      ),
+                    fontSize: 9,
+                    color: AppColors.goldBright,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   meet.icebreaker,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(height: 1.35),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(height: 1.35),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'With $other',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                 ),
               ],
             ),
@@ -730,7 +760,10 @@ class _IcebreakerView extends StatelessWidget {
           const Text(
             'ICEBREAKER COMPLETE',
             textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.successGreen, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: AppColors.successGreen,
+              fontWeight: FontWeight.bold,
+            ),
           ),
       ],
     );

@@ -14,6 +14,7 @@ abstract class SessionStoreDelegate extends ChangeNotifier {
   Future<ClubSessionRecord?> findByCode(String code);
   List<ClubSessionRecord> get activeSessions;
   Future<ClubSessionRecord?> fetchActiveSessionForMember(String memberId);
+  Future<int> completeStaleSessions({String? memberId});
 
   Future<void> upsert(ClubSessionRecord session);
   Future<void> confirmEntry(String sessionId);

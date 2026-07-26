@@ -2,35 +2,66 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:live_activities/live_activities.dart';
+import 'package:flutter/services.dart';
 
 /// Dynamic Island / Lock Screen / Apple Watch Live Activity for time-as-currency.
 ///
-/// Apple Watch shows the same Live Activity automatically when the iPhone
-/// activity is running (watchOS 10.1+ / 11 preferred). No separate Watch app.
+/// Uses a native ActivityKit bridge that puts timer/member fields in ContentState.
+/// That is required for Apple Watch (watchOS 11 Smart Stack): the Watch re-renders
+/// the `.small` family remotely and cannot read iPhone App Group UserDefaults.
 class TimeLiveActivityService {
   TimeLiveActivityService();
 
   static const appGroupId = 'group.com.intime.inTimeBartender';
   static const _activityId = 'blind-tiger-time';
+  static const _channel = MethodChannel(
+    'com.intime.inTimeBartender/live_activity',
+  );
+  static const _tokenChannel = EventChannel(
+    'com.intime.inTimeBartender/live_activity_tokens',
+  );
 
   /// Native countdown is clearest under ~36h; above that we show the wallet label
   /// (e.g. "423h 12m") so Island/Watch never silently clamp to ~7 days.
   static const liveCountdownMaxSeconds = 36 * 3600;
 
-  final LiveActivities _plugin = LiveActivities();
   bool _ready = false;
   Future<void>? _inflight;
+  StreamSubscription<dynamic>? _tokenSub;
+  String? _liveActivityPushToken;
+  String? _pushToStartToken;
+  void Function(String token, {required String kind})? onPushToken;
+
+  String? get liveActivityPushToken => _liveActivityPushToken;
+  String? get pushToStartToken => _pushToStartToken;
+  bool get isReady => _ready;
 
   Future<void> init() async {
     if (kIsWeb || !Platform.isIOS) return;
     try {
-      await _plugin.init(appGroupId: appGroupId, urlScheme: 'blindtiger');
-      // Kill orphans from prior launches so the lock screen never stacks twins.
-      await _plugin.endAllActivities();
+      try {
+        await _channel.invokeMethod<void>('endAll');
+      } catch (e) {
+        debugPrint('LiveActivity endAll on init: $e');
+      }
       _ready = true;
-    } catch (_) {
+
+      _tokenSub?.cancel();
+      _tokenSub = _tokenChannel.receiveBroadcastStream().listen((event) {
+        if (event is! Map) return;
+        final kind = event['kind'] as String?;
+        final token = event['token'] as String?;
+        if (kind == null || token == null || token.isEmpty) return;
+        if (kind == 'live_activity') {
+          _liveActivityPushToken = token;
+        } else if (kind == 'live_activity_start') {
+          _pushToStartToken = token;
+        }
+        onPushToken?.call(token, kind: kind);
+      });
+    } catch (e, st) {
       _ready = false;
+      debugPrint('LiveActivity init failed: $e\n$st');
     }
   }
 
@@ -39,21 +70,38 @@ class TimeLiveActivityService {
     required String branch,
     required String status,
     required int remainingSeconds,
+    String? socialAlertTitle,
+    String? socialAlertBody,
+    String? socialAlertSender,
   }) {
     final now = DateTime.now();
     final seconds = remainingSeconds < 0 ? 0 : remainingSeconds;
+    // Typical club packages are ≤8h; timerInterval ticks without app wakes.
+    // Above 36h we send a static remainingLabel (demo mega-wallets only) — that
+    // label only refreshes when we sync ContentState (not every second).
     final useLiveCountdown = seconds > 0 && seconds <= liveCountdownMaxSeconds;
     final end = now.add(Duration(seconds: seconds == 0 ? 1 : seconds));
+    final hasSocial = socialAlertTitle != null && socialAlertTitle.isNotEmpty;
     return {
       'memberName': memberName,
       'branch': branch,
       'status': status,
-      'timerStartMs': now.millisecondsSinceEpoch,
-      'timerEndMs': end.millisecondsSinceEpoch,
+      // Doubles survive MethodChannel → Swift NSNumber more reliably than Int64 ms.
+      'timerStartMs': now.millisecondsSinceEpoch.toDouble(),
+      'timerEndMs': end.millisecondsSinceEpoch.toDouble(),
+      // Small int — bridge falls back to this if ms timestamps ever fail to decode.
       'remainingSeconds': seconds,
       'useLiveCountdown': useLiveCountdown,
       'urgent': seconds > 0 && seconds <= 10 * 60,
       'remainingLabel': _format(seconds),
+      'hasSocialAlert': hasSocial,
+      'socialAlertTitle': socialAlertTitle ?? '',
+      'socialAlertBody': socialAlertBody ?? '',
+      'socialAlertSender': socialAlertSender ?? '',
+      'activityId': _activityId,
+      'staleInMinutes': 8 * 60,
+      // Prefer push tokens when entitlements are present; bridge falls back locally.
+      'enableRemoteUpdates': true,
     };
   }
 
@@ -74,8 +122,11 @@ class TimeLiveActivityService {
     required String branch,
     required String status,
     required int remainingSeconds,
+    String? socialAlertTitle,
+    String? socialAlertBody,
+    String? socialAlertSender,
+    bool withSystemAlert = false,
   }) {
-    // Serialize — parallel createOrUpdate races create duplicate lock-screen cards.
     final previous = _inflight;
     late final Future<void> run;
     run = () async {
@@ -90,6 +141,10 @@ class TimeLiveActivityService {
         branch: branch,
         status: status,
         remainingSeconds: remainingSeconds,
+        socialAlertTitle: socialAlertTitle,
+        socialAlertBody: socialAlertBody,
+        socialAlertSender: socialAlertSender,
+        withSystemAlert: withSystemAlert,
       );
     }();
     _inflight = run;
@@ -102,21 +157,25 @@ class TimeLiveActivityService {
     required String branch,
     required String status,
     required int remainingSeconds,
+    String? socialAlertTitle,
+    String? socialAlertBody,
+    String? socialAlertSender,
+    bool withSystemAlert = false,
   }) async {
-    if (!_ready) return;
+    if (!_ready) {
+      await init();
+      if (!_ready) return;
+    }
     if (!insideOrExiting || remainingSeconds < 0) {
       await _endBody();
       return;
     }
 
     try {
-      final enabled = await _plugin.areActivitiesEnabled();
-      if (!enabled) return;
-
-      // If somehow multiple exist, collapse to one before upsert.
-      final ids = await _plugin.getAllActivitiesIds();
-      if (ids.length > 1) {
-        await _plugin.endAllActivities();
+      final enabled = await _channel.invokeMethod<bool>('areActivitiesEnabled');
+      if (enabled != true) {
+        debugPrint('LiveActivity: disabled in iOS Settings');
+        return;
       }
 
       final data = _payload(
@@ -124,30 +183,15 @@ class TimeLiveActivityService {
         branch: branch,
         status: status,
         remainingSeconds: remainingSeconds,
+        socialAlertTitle: socialAlertTitle,
+        socialAlertBody: socialAlertBody,
+        socialAlertSender: socialAlertSender,
       );
+      data['withSystemAlert'] = withSystemAlert;
 
-      await _plugin.createOrUpdateActivity(
-        _activityId,
-        data,
-        removeWhenAppIsKilled: false,
-        iOSEnableRemoteUpdates: false,
-        staleIn: const Duration(hours: 8),
-      );
-
-      // Belt-and-suspenders: never leave more than one Live Activity alive.
-      final after = await _plugin.getAllActivitiesIds();
-      if (after.length > 1) {
-        await _plugin.endAllActivities();
-        await _plugin.createOrUpdateActivity(
-          _activityId,
-          data,
-          removeWhenAppIsKilled: false,
-          iOSEnableRemoteUpdates: false,
-          staleIn: const Duration(hours: 8),
-        );
-      }
-    } catch (_) {
-      // Simulator / denied Live Activities — ignore.
+      await _channel.invokeMethod<String>('sync', data);
+    } catch (e, st) {
+      debugPrint('LiveActivity sync failed: $e\n$st');
     }
   }
 
@@ -169,7 +213,9 @@ class TimeLiveActivityService {
   Future<void> _endBody() async {
     if (!_ready) return;
     try {
-      await _plugin.endAllActivities();
-    } catch (_) {}
+      await _channel.invokeMethod<void>('endAll');
+    } catch (e) {
+      debugPrint('LiveActivity end failed: $e');
+    }
   }
 }

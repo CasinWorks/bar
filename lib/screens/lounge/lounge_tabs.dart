@@ -7,9 +7,16 @@ import '../../data/mock_data.dart';
 import '../../models/blind_tiger_models.dart';
 import '../../models/social_play.dart';
 import '../../providers/app_state.dart';
+import 'add_friend_sheet.dart';
 import 'drink_detail_sheet.dart';
+import 'friend_actions_sheet.dart';
+import 'friend_requests_sheet.dart';
+import 'friends_chats_sheet.dart';
+import 'mutual_friends_nearby_sheet.dart';
 import 'mini_game_modal.dart';
 import 'pass_the_glass_sheet.dart';
+import 'ride_assist_sheet.dart';
+import 'safety_report_sheet.dart';
 import 'toast_to_meet_sheet.dart';
 
 class ChallengesTab extends StatelessWidget {
@@ -21,7 +28,10 @@ class ChallengesTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('SOCIALITE CHALLENGES', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9)),
+        Text(
+          'SOCIALITE CHALLENGES',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+        ),
         const SizedBox(height: 8),
         ...state.challenges.map((chal) => _ChallengeCard(challenge: chal)),
       ],
@@ -36,7 +46,10 @@ class _ChallengeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.read<AppState>();
-    final progress = (challenge.currentCount / challenge.targetCount).clamp(0.0, 1.0);
+    final progress = (challenge.currentCount / challenge.targetCount).clamp(
+      0.0,
+      1.0,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -47,21 +60,45 @@ class _ChallengeCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(_iconFor(challenge.icon), color: AppColors.goldBright, size: 18),
+                Icon(
+                  _iconFor(challenge.icon),
+                  color: AppColors.goldBright,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: Text(challenge.title, style: const TextStyle(fontWeight: FontWeight.bold))),
-                Text('+${challenge.points} PTS', style: const TextStyle(color: AppColors.goldBright, fontSize: 10)),
+                Expanded(
+                  child: Text(
+                    challenge.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  challenge.bonusMinutes > 0
+                      ? '+${challenge.bonusMinutes} MIN'
+                      : '+${challenge.points} PTS',
+                  style: const TextStyle(
+                    color: AppColors.tigerRed,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(value: progress, minHeight: 6, color: AppColors.goldBrushed),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                color: AppColors.goldBrushed,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               '${challenge.currentCount}/${challenge.targetCount}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 10),
             ),
             if (challenge.isComplete && !challenge.claimed)
               Padding(
@@ -74,7 +111,14 @@ class _ChallengeCard extends StatelessWidget {
             if (challenge.claimed)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Text('CLAIMED', style: TextStyle(color: AppColors.successGreen, fontSize: 10, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'CLAIMED',
+                  style: TextStyle(
+                    color: AppColors.successGreen,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
           ],
         ),
@@ -83,12 +127,12 @@ class _ChallengeCard extends StatelessWidget {
   }
 
   IconData _iconFor(String icon) => switch (icon) {
-        'door' => Icons.door_front_door,
-        'drink' => Icons.local_bar,
-        'game' => Icons.casino,
-        'social' => Icons.people,
-        _ => Icons.star,
-      };
+    'door' => Icons.door_front_door,
+    'drink' => Icons.local_bar,
+    'game' => Icons.casino,
+    'social' => Icons.people,
+    _ => Icons.star,
+  };
 }
 
 class GamesTab extends StatefulWidget {
@@ -104,6 +148,8 @@ class _GamesTabState extends State<GamesTab> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AppState>().refreshWhosInside();
+      context.read<AppState>().refreshFriendRequests();
+      context.read<AppState>().refreshMutualFriendsNearby();
     });
   }
 
@@ -118,93 +164,111 @@ class _GamesTabState extends State<GamesTab> {
         FadeSlideIn(
           child: Text(
             'WITH SOMEONE',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontSize: 9),
           ),
         ),
         const SizedBox(height: 8),
         FadeSlideIn(
           delay: const Duration(milliseconds: 60),
           child: LuxuryCard(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Open to Meet',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        Text(
-                          state.canSpendTime
-                              ? 'Appear on Who’s Inside at this branch'
-                              : 'Enter the club with time to opt in',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
-                        ),
-                      ],
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Open to Meet',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            state.canSpendTime
+                                ? 'Appear on Who’s Inside at this branch'
+                                : 'Enter the club with time to opt in',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                          ),
+                        ],
+                      ),
                     ),
+                    Switch(
+                      value: state.openToMeet,
+                      activeThumbColor: AppColors.timerNeon,
+                      onChanged: state.canSpendTime
+                          ? (v) => state.setOpenToMeet(v)
+                          : null,
+                    ),
+                  ],
+                ),
+                if (state.openToMeet || state.canSpendTime) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'YOUR VIBE',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(fontSize: 8),
                   ),
-                  Switch(
-                    value: state.openToMeet,
-                    activeThumbColor: AppColors.timerNeon,
-                    onChanged: state.canSpendTime
-                        ? (v) => state.setOpenToMeet(v)
-                        : null,
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: SocialVibeTags.options.map((tag) {
+                      final selected = state.vibeTag == tag;
+                      return GestureDetector(
+                        onTap: () => state.setVibeTag(tag),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: selected
+                                  ? AppColors.goldBright
+                                  : AppColors.neutral500,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            color: selected
+                                ? AppColors.goldBright.withValues(alpha: 0.12)
+                                : Colors.transparent,
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: selected
+                                  ? AppColors.goldBright
+                                  : AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ],
-              ),
-              if (state.openToMeet || state.canSpendTime) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'YOUR VIBE',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 8),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: SocialVibeTags.options.map((tag) {
-                    final selected = state.vibeTag == tag;
-                    return GestureDetector(
-                      onTap: () => state.setVibeTag(tag),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: selected ? AppColors.goldBright : AppColors.neutral500,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                          color: selected
-                              ? AppColors.goldBright.withValues(alpha: 0.12)
-                              : Colors.transparent,
-                        ),
-                        child: Text(
-                          tag,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: selected ? AppColors.goldBright : AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
               ],
-            ],
+            ),
           ),
-        ),
         ),
         const SizedBox(height: 12),
         FadeSlideIn(
           delay: const Duration(milliseconds: 100),
           child: Text(
             'WHO’S INSIDE',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontSize: 9),
           ),
         ),
         const SizedBox(height: 8),
@@ -217,17 +281,33 @@ class _GamesTabState extends State<GamesTab> {
                 state.openToMeet
                     ? 'You’re visible — waiting for other socialites…'
                     : 'Turn on Open to Meet to see who’s down for a toast.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 11),
               ),
             ),
           )
         else
           ...others.asMap().entries.map(
-                (e) => FadeSlideIn(
-                  delay: Duration(milliseconds: 120 + e.key * 50),
-                  child: _PresenceTile(presence: e.value),
-                ),
-              ),
+            (e) => FadeSlideIn(
+              delay: Duration(milliseconds: 120 + e.key * 50),
+              child: _PresenceTile(presence: e.value),
+            ),
+          ),
+        const SizedBox(height: 12),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 160),
+          child: _FriendsNearbyCard(
+            requestCount: state.friendRequests
+                .where(
+                  (r) =>
+                      r.direction == 'inbound' &&
+                      r.status == FriendRequestStatus.pending,
+                )
+                .length,
+            nearbyCount: state.mutualFriendsNearby.length,
+          ),
+        ),
         const SizedBox(height: 12),
         FadeSlideIn(
           delay: const Duration(milliseconds: 180),
@@ -255,84 +335,219 @@ class _GamesTabState extends State<GamesTab> {
           delay: const Duration(milliseconds: 260),
           child: Text(
             'SOLO',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontSize: 9),
           ),
         ),
         const SizedBox(height: 8),
         FadeSlideIn(
           delay: const Duration(milliseconds: 300),
           child: GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.85,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-          ),
-          itemCount: MockData.miniGames.length,
-          itemBuilder: (context, i) {
-            final game = MockData.miniGames[i];
-            final locked = (game.locked && state.points < 150) || !state.canSpendTime;
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: locked
-                    ? null
-                    : () {
-                        if (!state.canSpendTime) return;
-                        MiniGameModal.show(context, game);
-                      },
-                child: Opacity(
-                  opacity: locked ? 0.5 : 1,
-                  child: LuxuryCard(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          _gameIcon(game.icon),
-                          color: locked ? AppColors.neutral500 : AppColors.goldBright,
-                        ),
-                        const Spacer(),
-                        Text(
-                          game.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                        ),
-                        Text(
-                          '+${game.points} PTS',
-                          style: const TextStyle(fontSize: 9, color: AppColors.goldBrushed),
-                        ),
-                        if (locked)
-                          Text(
-                            game.lockRequirement ?? '',
-                            style: const TextStyle(fontSize: 8, color: AppColors.tigerOrange),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.85,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: MockData.miniGames.length,
+            itemBuilder: (context, i) {
+              final game = MockData.miniGames[i];
+              final locked =
+                  (game.locked && state.points < 150) || !state.canSpendTime;
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: locked
+                      ? null
+                      : () {
+                          if (!state.canSpendTime) return;
+                          MiniGameModal.show(context, game);
+                        },
+                  child: Opacity(
+                    opacity: locked ? 0.5 : 1,
+                    child: LuxuryCard(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            _gameIcon(game.icon),
+                            color: locked
+                                ? AppColors.neutral500
+                                : AppColors.goldBright,
                           ),
-                      ],
+                          const Spacer(),
+                          Text(
+                            game.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                          Text(
+                            '+${game.points} PTS',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: AppColors.goldBrushed,
+                            ),
+                          ),
+                          if (locked)
+                            Text(
+                              game.lockRequirement ?? '',
+                              style: const TextStyle(
+                                fontSize: 8,
+                                color: AppColors.tigerOrange,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
   IconData _gameIcon(String icon) => switch (icon) {
-        'roulette' => Icons.album,
-        'guess' => Icons.psychology,
-        'shot' => Icons.music_note,
-        'card' => Icons.style,
-        'cipher' => Icons.lock,
-        'mystery' => Icons.workspace_premium,
-        _ => Icons.videogame_asset,
-      };
+    'roulette' => Icons.album,
+    'guess' => Icons.psychology,
+    'shot' => Icons.music_note,
+    'card' => Icons.style,
+    'cipher' => Icons.lock,
+    'mystery' => Icons.workspace_premium,
+    _ => Icons.videogame_asset,
+  };
+}
+
+class _FriendsNearbyCard extends StatelessWidget {
+  const _FriendsNearbyCard({
+    required this.requestCount,
+    required this.nearbyCount,
+  });
+
+  final int requestCount;
+  final int nearbyCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return LuxuryCard(
+      padding: const EdgeInsets.all(14),
+      highlighted: nearbyCount > 0,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Friends Nearby',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              if (requestCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerRed.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                      color: AppColors.dangerRed.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Text(
+                    '$requestCount request${requestCount == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      color: AppColors.dangerRed,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            nearbyCount > 0
+                ? '$nearbyCount mutual friend${nearbyCount == 1 ? '' : 's'} inside this branch.'
+                : 'Mutual opt-in only. No GPS, just same active branch.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontSize: 10),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TigerButton(
+                  label: 'ADD FRIEND',
+                  icon: Icons.person_add,
+                  onPressed: () => AddFriendSheet.show(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TigerButton(
+                  label: 'REQUESTS',
+                  icon: Icons.inbox,
+                  secondary: true,
+                  onPressed: () => FriendRequestsSheet.show(context),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TigerButton(
+                  label: 'NEARBY',
+                  icon: Icons.people,
+                  secondary: true,
+                  onPressed: () => MutualFriendsNearbySheet.show(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TigerButton(
+                  label: 'CHATS',
+                  icon: Icons.chat_bubble_outline,
+                  secondary: true,
+                  onPressed: () => FriendsChatsSheet.show(context),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TigerButton(
+            label: 'REPORT',
+            icon: Icons.report,
+            secondary: true,
+            onPressed: () => SafetyReportSheet.show(context),
+          ),
+          const SizedBox(height: 8),
+          TigerButton(
+            label: 'GET A RIDE',
+            icon: Icons.local_taxi,
+            secondary: true,
+            onPressed: () => RideAssistSheet.show(context),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PresenceTile extends StatelessWidget {
@@ -354,7 +569,10 @@ class _PresenceTile extends StatelessWidget {
                 presence.displayName.isNotEmpty
                     ? presence.displayName[0].toUpperCase()
                     : '?',
-                style: const TextStyle(color: AppColors.goldBright, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: AppColors.goldBright,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -364,16 +582,35 @@ class _PresenceTile extends StatelessWidget {
                 children: [
                   Text(
                     presence.displayName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                   Text(
                     presence.vibeTag,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.waving_hand, size: 16, color: AppColors.timerNeon),
+            IconButton(
+              tooltip: 'Safety actions',
+              icon: const Icon(Icons.more_horiz, color: AppColors.timerNeon),
+              onPressed: () => FriendActionsSheet.show(
+                context,
+                FriendProfile(
+                  memberId: presence.memberId,
+                  displayName: presence.displayName,
+                  branch: presence.branch,
+                  vibeTag: presence.vibeTag,
+                  updatedAt: presence.updatedAt,
+                  isNearby: true,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -396,7 +633,10 @@ class SocialTab extends StatelessWidget {
           onPressed: () => PassTheGlassSheet.show(context),
         ),
         const SizedBox(height: 12),
-        Text('LOUNGE ACTIVITY', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9)),
+        Text(
+          'LOUNGE ACTIVITY',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+        ),
         const SizedBox(height: 8),
         ...state.feedEvents.map((event) => _FeedCard(event: event)),
       ],
@@ -423,28 +663,65 @@ class _FeedCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: Color(event.avatarSeed.color),
-                  child: Text(event.avatarSeed.hair, style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    event.avatarSeed.hair,
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${event.userName} ${event.userRank}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                      Text(event.timeAgo, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 9)),
+                      Text(
+                        '${event.userName} ${event.userRank}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        event.timeAgo,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 9),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(event.eventText, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11)),
+            Text(
+              event.eventText,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
-                _ReactionBtn(label: 'LUXE', count: event.likes['luxe'] ?? 0, active: event.userReacted == 'luxe', onTap: () => state.reactToFeed(event.id, 'luxe')),
-                _ReactionBtn(label: 'SALUTE', count: event.likes['salute'] ?? 0, active: event.userReacted == 'salute', onTap: () => state.reactToFeed(event.id, 'salute')),
-                _ReactionBtn(label: 'GOLD', count: event.likes['gold'] ?? 0, active: event.userReacted == 'gold', onTap: () => state.reactToFeed(event.id, 'gold')),
+                _ReactionBtn(
+                  label: 'LUXE',
+                  count: event.likes['luxe'] ?? 0,
+                  active: event.userReacted == 'luxe',
+                  onTap: () => state.reactToFeed(event.id, 'luxe'),
+                ),
+                _ReactionBtn(
+                  label: 'SALUTE',
+                  count: event.likes['salute'] ?? 0,
+                  active: event.userReacted == 'salute',
+                  onTap: () => state.reactToFeed(event.id, 'salute'),
+                ),
+                _ReactionBtn(
+                  label: 'GOLD',
+                  count: event.likes['gold'] ?? 0,
+                  active: event.userReacted == 'gold',
+                  onTap: () => state.reactToFeed(event.id, 'gold'),
+                ),
               ],
             ),
           ],
@@ -455,7 +732,12 @@ class _FeedCard extends StatelessWidget {
 }
 
 class _ReactionBtn extends StatelessWidget {
-  const _ReactionBtn({required this.label, required this.count, required this.active, required this.onTap});
+  const _ReactionBtn({
+    required this.label,
+    required this.count,
+    required this.active,
+    required this.onTap,
+  });
   final String label;
   final int count;
   final bool active;
@@ -471,7 +753,10 @@ class _ReactionBtn extends StatelessWidget {
           foregroundColor: active ? AppColors.goldBright : AppColors.textMuted,
           padding: const EdgeInsets.symmetric(horizontal: 8),
         ),
-        child: Text('$label $count', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
+        child: Text(
+          '$label $count',
+          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -485,7 +770,10 @@ class MenuTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('STORYTELLING CONCOCTIONS', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9)),
+        Text(
+          'STORYTELLING CONCOCTIONS',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+        ),
         const SizedBox(height: 8),
         ...MockData.drinks.map((drink) => _DrinkTile(drink: drink)),
       ],
@@ -515,7 +803,12 @@ class _DrinkTile extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    gradient: LinearGradient(colors: [Color(drink.imageColorStart), Color(drink.imageColorEnd)]),
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(drink.imageColorStart),
+                        Color(drink.imageColorEnd),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -523,17 +816,49 @@ class _DrinkTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(drink.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                      Text(drink.flavor, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 9)),
-                      Text('-${drink.timeCostSeconds ~/ 60} min', style: const TextStyle(color: AppColors.dangerRed, fontSize: 9)),
+                      Text(
+                        drink.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        drink.flavor,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 9),
+                      ),
+                      Text(
+                        drink.isStandard
+                            ? 'Package drink'
+                            : '-${drink.timeCostSeconds ~/ 60} min',
+                        style: TextStyle(
+                          color: drink.isStandard
+                              ? AppColors.timerHealthy
+                              : AppColors.tigerRed,
+                          fontSize: 9,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(drink.price, style: const TextStyle(color: AppColors.goldBright, fontWeight: FontWeight.bold, fontSize: 11)),
-                    const Icon(Icons.chevron_right, color: AppColors.goldBrushed, size: 20),
+                    Text(
+                      drink.price,
+                      style: const TextStyle(
+                        color: AppColors.goldBright,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: AppColors.goldBrushed,
+                      size: 20,
+                    ),
                   ],
                 ),
               ],
@@ -578,10 +903,16 @@ class LeaderboardTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(state.user?.name ?? 'You', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        state.user?.name ?? 'You',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       Text(
                         '#${state.currentRank} • ${state.formatDuration(state.spendableTimeSeconds)} • ${state.memberTier.label}',
-                        style: const TextStyle(color: AppColors.timerNeon, fontSize: 10),
+                        style: const TextStyle(
+                          color: AppColors.timerNeon,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
@@ -600,7 +931,9 @@ class LeaderboardTab extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'LIVE CLUB RANKINGS · BY WALLET TIME',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontSize: 9),
           ),
           const SizedBox(height: 8),
           if (state.leaderboard.isEmpty)
@@ -636,20 +969,44 @@ class _LeaderRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Text('#${user.rank}', style: TextStyle(color: user.isCurrentUser ? AppColors.goldBright : AppColors.textMuted, fontWeight: FontWeight.bold)),
+            Text(
+              '#${user.rank}',
+              style: TextStyle(
+                color: user.isCurrentUser
+                    ? AppColors.goldBright
+                    : AppColors.textMuted,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(width: 12),
             CircleAvatar(
               radius: 14,
               backgroundColor: Color(user.avatarColor),
-              child: Text(user.avatarGlyph, style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold)),
+              child: Text(
+                user.avatarGlyph,
+                style: const TextStyle(
+                  fontSize: 7,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(user.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: user.isCurrentUser ? AppColors.goldBright : null)),
-                  Text(user.tier.label, style: TextStyle(fontSize: 9, color: user.tier.accentColor)),
+                  Text(
+                    user.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      color: user.isCurrentUser ? AppColors.goldBright : null,
+                    ),
+                  ),
+                  Text(
+                    user.tier.label,
+                    style: TextStyle(fontSize: 9, color: user.tier.accentColor),
+                  ),
                 ],
               ),
             ),
@@ -657,7 +1014,9 @@ class _LeaderRow extends StatelessWidget {
               timeLabel,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: user.isCurrentUser ? AppColors.timerNeon : AppColors.timerNeonGlow,
+                color: user.isCurrentUser
+                    ? AppColors.timerNeon
+                    : AppColors.timerNeonGlow,
                 fontSize: 11,
                 shadows: user.isCurrentUser
                     ? AppColors.timerGlow(AppColors.timerNeon, intensity: 0.5)

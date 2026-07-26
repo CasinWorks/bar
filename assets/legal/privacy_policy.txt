@@ -1,0 +1,33 @@
+BLIND TIGER — PRIVACY POLICY (PILOT)
+
+Last updated: Pilot soft launch
+
+The Blind Tiger Social Club ("we", "the club") operates the Blind Tiger mobile app and admin tools for members and staff during our venue pilot.
+
+What we collect
+• Account: name, email, birthdate (21+ verification), and club role.
+• Visit data: time wallet balance, entry/exit timestamps, branch, session activity needed to run the time-based experience.
+• Social & safety (optional): friend requests, presence when you opt in to "Open to Meet", safety reports, ride assist requests — only as you use those features.
+• Staff operations: cash time loads, guest list, and safety desk records visible to authorized admin/staff.
+
+How we use it
+• To operate entry, your timer, rankings, tips, and social features you choose to use.
+• To keep the venue safe (private reports to staff; reported members are not notified).
+• We do not sell your personal data.
+
+Sharing
+• Service providers (e.g. cloud hosting/authentication) that process data on our behalf.
+• Venue staff and authorized admins for operations and safety.
+• Legal requirements when required by law.
+
+Your choices
+• You can opt out of social visibility by turning off Open to Meet.
+• Contact the club desk to ask about account access or correction during the pilot.
+
+Security
+• We use industry-standard authentication and access controls. No system is 100% secure; report concerns to the club.
+
+Contact
+• Blind Tiger Social Club — ask staff at the venue or your pilot coordinator for privacy questions.
+
+This is a simplified pilot notice, not legal advice. A full policy may replace this before public App Store launch.

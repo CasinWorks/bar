@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { requireAdmin } from '../middleware/auth.js';
-import { resolveLoad, CASH_PACKAGES } from '../lib/timePricing.js';
+import { resolveLoad, ENTRY_PACKAGES } from '../lib/timePricing.js';
 
 const router = Router();
 
@@ -24,7 +24,6 @@ async function fetchTimeLoads() {
 
   if (!relationshipError) return { data: null, error };
 
-  // Fallback: plain rows + manual profile lookup (schema cache / FK hint issues).
   const { data: rows, error: rowError } = await supabaseAdmin
     .from('time_loads')
     .select('*')
@@ -59,7 +58,7 @@ async function fetchTimeLoads() {
 }
 
 router.get('/packages', requireAdmin, (_req, res) => {
-  res.json({ packages: CASH_PACKAGES });
+  res.json({ packages: ENTRY_PACKAGES });
 });
 
 router.get('/', requireAdmin, async (req, res) => {
@@ -69,15 +68,25 @@ router.get('/', requireAdmin, async (req, res) => {
 });
 
 router.post('/', requireAdmin, async (req, res) => {
-  const { recipientId, amountPeso, billCount, paymentMethod, notes } = req.body;
+  const {
+    recipientId,
+    packageSlug,
+    amountPeso,
+    billCount,
+    quantity,
+    paymentMethod,
+    notes,
+  } = req.body;
 
   if (!recipientId) {
     return res.status(400).json({ error: 'Select an account.' });
   }
 
   const resolved = resolveLoad({
+    packageSlug,
     amountPeso,
     billCount,
+    quantity,
     paymentMethod: paymentMethod || 'cash',
   });
 
@@ -85,22 +94,66 @@ router.post('/', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: resolved.error });
   }
 
-  const { data, error } = await supabaseAdmin.rpc('admin_load_time', {
+  let data;
+  let error;
+  const rpc = await supabaseAdmin.rpc('admin_load_package', {
     p_member_id: recipientId,
-    p_seconds: resolved.seconds,
-    p_amount_peso: resolved.totalPeso,
+    p_package_slug: resolved.pkg.slug,
     p_payment_method: paymentMethod || 'cash',
     p_notes: notes || null,
     p_admin_id: req.profile.id,
+    p_quantity: resolved.count,
   });
+
+  if (rpc.error?.message?.includes('admin_load_package')) {
+    const legacy = await supabaseAdmin.rpc('admin_load_time', {
+      p_member_id: recipientId,
+      p_seconds: resolved.seconds,
+      p_amount_peso: resolved.totalPeso,
+      p_payment_method: paymentMethod || 'cash',
+      p_notes: notes || `package:${resolved.pkg.slug}`,
+      p_admin_id: req.profile.id,
+    });
+    data = legacy.data;
+    error = legacy.error;
+  } else {
+    data = rpc.data;
+    error = rpc.error;
+  }
 
   if (error) return res.status(400).json({ error: error.message });
   res.json({
     load: data,
+    packageSlug: resolved.pkg.slug,
+    packageName: resolved.pkg.name,
     totalPeso: resolved.totalPeso,
     totalMinutes: resolved.totalMinutes,
+    drinks: resolved.drinks,
     billCount: resolved.count,
   });
+});
+
+router.post('/bonus', requireAdmin, async (req, res) => {
+  const { recipientId, ruleSlug, minutes, notes } = req.body;
+  if (!recipientId || !ruleSlug) {
+    return res.status(400).json({ error: 'Recipient and bonus rule required.' });
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('admin_award_bonus_time', {
+    p_member_id: recipientId,
+    p_rule_slug: ruleSlug,
+    p_minutes: minutes ?? null,
+    p_notes: notes || null,
+    p_admin_id: req.profile.id,
+  });
+
+  if (error?.message?.includes('admin_award_bonus_time')) {
+    return res.status(503).json({
+      error: 'Bonus awards require migration 020_time_packages_economy.sql.',
+    });
+  }
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ award: data });
 });
 
 router.post('/:id/void', requireAdmin, async (req, res) => {

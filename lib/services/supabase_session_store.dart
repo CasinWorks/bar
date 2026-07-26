@@ -12,7 +12,9 @@ class SupabaseSessionStore extends SessionStoreDelegate {
   bool get usesRealtime => true;
 
   @override
-  Future<void> load() async {}
+  Future<void> load() async {
+    await completeStaleSessions();
+  }
 
   @override
   Future<void> subscribeToSession(String? sessionId) async {
@@ -59,16 +61,24 @@ class SupabaseSessionStore extends SessionStoreDelegate {
 
   @override
   Future<ClubSessionRecord?> fetchSessionFresh(String id) async {
-    final row = await _client.from('club_sessions').select().eq('id', id).maybeSingle();
+    await completeStaleSessions();
+    final row = await _client
+        .from('club_sessions')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
     if (row == null) return null;
 
-    final session = ClubSessionRecord.fromSupabaseRow(Map<String, dynamic>.from(row));
+    final session = ClubSessionRecord.fromSupabaseRow(
+      Map<String, dynamic>.from(row),
+    );
     _cache[id] = session;
     return session;
   }
 
   @override
   Future<ClubSessionRecord?> findByCode(String code) async {
+    await completeStaleSessions();
     final normalized = code.trim().toUpperCase();
     final rows = await _client.from('club_sessions').select();
     for (final row in rows) {
@@ -83,7 +93,10 @@ class SupabaseSessionStore extends SessionStoreDelegate {
       _cache.values.where((s) => s.phase != SessionPhase.completed).toList();
 
   @override
-  Future<ClubSessionRecord?> fetchActiveSessionForMember(String memberId) async {
+  Future<ClubSessionRecord?> fetchActiveSessionForMember(
+    String memberId,
+  ) async {
+    await completeStaleSessions(memberId: memberId);
     final rows = await _client
         .from('club_sessions')
         .select()
@@ -93,13 +106,83 @@ class SupabaseSessionStore extends SessionStoreDelegate {
     if (rows.isEmpty) return null;
 
     final sessions = rows
-        .map((row) => ClubSessionRecord.fromSupabaseRow(Map<String, dynamic>.from(row)))
+        .map(
+          (row) =>
+              ClubSessionRecord.fromSupabaseRow(Map<String, dynamic>.from(row)),
+        )
         .toList();
     final session = ClubSessionRecord.pickActiveForMember(sessions, memberId);
     if (session == null) return null;
 
     _cache[session.id] = session;
     return session;
+  }
+
+  @override
+  Future<int> completeStaleSessions({String? memberId}) async {
+    try {
+      final result = await _client.rpc(
+        'complete_stale_club_sessions',
+        params: {'p_member_id': memberId},
+      );
+      final count = result as int? ?? 0;
+      if (count > 0) {
+        _cache.updateAll((_, session) {
+          if (memberId != null && session.memberId != memberId) {
+            return session;
+          }
+          session.applyAutoBadgeOut();
+          return session;
+        });
+        notifyListeners();
+      }
+      return count;
+    } catch (_) {
+      return _completeStaleSessionsDirect(memberId: memberId);
+    }
+  }
+
+  Future<int> _completeStaleSessionsDirect({String? memberId}) async {
+    try {
+      var query = _client
+          .from('club_sessions')
+          .select()
+          .or('phase.eq.inside_club,phase.eq.awaiting_exit_scan')
+          .lte(
+            'entered_at',
+            DateTime.now()
+                .subtract(ClubSessionRecord.autoBadgeOutAfter)
+                .toUtc()
+                .toIso8601String(),
+          );
+      if (memberId != null) {
+        query = query.eq('member_id', memberId);
+      }
+
+      final rows = await query;
+      var count = 0;
+      for (final row in rows) {
+        final session = ClubSessionRecord.fromSupabaseRow(
+          Map<String, dynamic>.from(row),
+        );
+        if (!session.isAutoBadgeOutOverdue()) continue;
+        final exitedAt = session.autoBadgeOutAt ?? DateTime.now();
+        await _client
+            .from('club_sessions')
+            .update({
+              'phase': ClubSessionRecord.phaseToDb(SessionPhase.completed),
+              'exited_at': exitedAt.toUtc().toIso8601String(),
+            })
+            .eq('id', session.id);
+        session.applyAutoBadgeOut();
+        _cache[session.id] = session;
+        count++;
+      }
+      if (count > 0) notifyListeners();
+      return count;
+    } catch (_) {
+      return 0;
+    }
   }
 
   @override
@@ -112,15 +195,20 @@ class SupabaseSessionStore extends SessionStoreDelegate {
   @override
   Future<void> confirmEntry(String sessionId) async {
     final session = await fetchSessionFresh(sessionId);
-    if (session == null || session.phase != SessionPhase.paidAwaitingEntry) return;
+    if (session == null || session.phase != SessionPhase.paidAwaitingEntry) {
+      return;
+    }
 
     final now = DateTime.now();
-    await _client.from('club_sessions').update({
-      'phase': ClubSessionRecord.phaseToDb(SessionPhase.insideClub),
-      'remaining_seconds': session.remainingSeconds,
-      // Always UTC+Z so Postgres timestamptz is unambiguous.
-      'entered_at': now.toUtc().toIso8601String(),
-    }).eq('id', sessionId);
+    await _client
+        .from('club_sessions')
+        .update({
+          'phase': ClubSessionRecord.phaseToDb(SessionPhase.insideClub),
+          'remaining_seconds': session.remainingSeconds,
+          // Always UTC+Z so Postgres timestamptz is unambiguous.
+          'entered_at': now.toUtc().toIso8601String(),
+        })
+        .eq('id', sessionId);
 
     session.phase = SessionPhase.insideClub;
     session.enteredAt = now;
@@ -133,10 +221,13 @@ class SupabaseSessionStore extends SessionStoreDelegate {
     final session = await fetchSession(sessionId);
     if (session == null || session.phase != SessionPhase.insideClub) return;
 
-    await _client.from('club_sessions').update({
-      'phase': ClubSessionRecord.phaseToDb(SessionPhase.awaitingExitScan),
-      'remaining_seconds': session.remainingSeconds,
-    }).eq('id', sessionId);
+    await _client
+        .from('club_sessions')
+        .update({
+          'phase': ClubSessionRecord.phaseToDb(SessionPhase.awaitingExitScan),
+          'remaining_seconds': session.remainingSeconds,
+        })
+        .eq('id', sessionId);
 
     session.phase = SessionPhase.awaitingExitScan;
     _cache[sessionId] = session;
@@ -146,11 +237,14 @@ class SupabaseSessionStore extends SessionStoreDelegate {
   @override
   Future<void> cancelExitRequest(String sessionId) async {
     final session = await fetchSession(sessionId);
-    if (session == null || session.phase != SessionPhase.awaitingExitScan) return;
+    if (session == null || session.phase != SessionPhase.awaitingExitScan) {
+      return;
+    }
 
-    await _client.from('club_sessions').update({
-      'phase': ClubSessionRecord.phaseToDb(SessionPhase.insideClub),
-    }).eq('id', sessionId);
+    await _client
+        .from('club_sessions')
+        .update({'phase': ClubSessionRecord.phaseToDb(SessionPhase.insideClub)})
+        .eq('id', sessionId);
 
     session.phase = SessionPhase.insideClub;
     _cache[sessionId] = session;
@@ -160,13 +254,18 @@ class SupabaseSessionStore extends SessionStoreDelegate {
   @override
   Future<void> confirmExit(String sessionId) async {
     final session = await fetchSession(sessionId);
-    if (session == null || session.phase != SessionPhase.awaitingExitScan) return;
+    if (session == null || session.phase != SessionPhase.awaitingExitScan) {
+      return;
+    }
 
     final now = DateTime.now();
-    await _client.from('club_sessions').update({
-      'phase': ClubSessionRecord.phaseToDb(SessionPhase.completed),
-      'exited_at': now.toUtc().toIso8601String(),
-    }).eq('id', sessionId);
+    await _client
+        .from('club_sessions')
+        .update({
+          'phase': ClubSessionRecord.phaseToDb(SessionPhase.completed),
+          'exited_at': now.toUtc().toIso8601String(),
+        })
+        .eq('id', sessionId);
 
     session.phase = SessionPhase.completed;
     session.exitedAt = now;
@@ -182,9 +281,10 @@ class SupabaseSessionStore extends SessionStoreDelegate {
       return;
     }
 
-    await _client.from('club_sessions').update({
-      'remaining_seconds': seconds,
-    }).eq('id', sessionId);
+    await _client
+        .from('club_sessions')
+        .update({'remaining_seconds': seconds})
+        .eq('id', sessionId);
 
     final session = _cache[sessionId];
     if (session != null) {
@@ -196,13 +296,18 @@ class SupabaseSessionStore extends SessionStoreDelegate {
   @override
   Future<void> cancelSession(String sessionId) async {
     final session = await fetchSession(sessionId);
-    if (session == null || session.phase != SessionPhase.paidAwaitingEntry) return;
+    if (session == null || session.phase != SessionPhase.paidAwaitingEntry) {
+      return;
+    }
 
     final now = DateTime.now();
-    await _client.from('club_sessions').update({
-      'phase': ClubSessionRecord.phaseToDb(SessionPhase.completed),
-      'exited_at': now.toUtc().toIso8601String(),
-    }).eq('id', sessionId);
+    await _client
+        .from('club_sessions')
+        .update({
+          'phase': ClubSessionRecord.phaseToDb(SessionPhase.completed),
+          'exited_at': now.toUtc().toIso8601String(),
+        })
+        .eq('id', sessionId);
 
     session.phase = SessionPhase.completed;
     session.exitedAt = now;

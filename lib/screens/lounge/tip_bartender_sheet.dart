@@ -69,6 +69,7 @@ class _TipBartenderSheetState extends State<TipBartenderSheet> {
   }
 
   Future<void> _sendTip() async {
+    if (_busy) return;
     final pad = _pad;
     if (pad == null) return;
     setState(() {

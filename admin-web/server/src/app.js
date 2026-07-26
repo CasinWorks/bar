@@ -7,6 +7,9 @@ import eventsRoutes from './routes/events.js';
 import guestsRoutes from './routes/guests.js';
 import employeesRoutes from './routes/employees.js';
 import leaderboardRoutes from './routes/leaderboard.js';
+import safetySocialRoutes from './routes/safetySocial.js';
+import branchesRoutes from './routes/branches.js';
+import pushRoutes from './routes/push.js';
 
 const app = express();
 
@@ -46,6 +49,9 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/guests', guestsRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/safety-social', safetySocialRoutes);
+app.use('/api/branches', branchesRoutes);
+app.use('/api/push', pushRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

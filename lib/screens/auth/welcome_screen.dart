@@ -444,7 +444,7 @@ class _HeroScene extends StatelessWidget {
               t: _stagger(t, 0.08, 0.4),
               dy: 22,
               child: Text(
-                'The tiger behind\nthe velvet door.',
+                'Your time starts now.',
                 style: GoogleFonts.cinzel(
                   fontSize: 30,
                   fontWeight: FontWeight.w700,
@@ -457,7 +457,7 @@ class _HeroScene extends StatelessWidget {
             _in(
               t: _stagger(t, 0.18, 0.4),
               child: Text(
-                'Time is the currency of the night.',
+                'TIME IS YOUR CURRENCY.',
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   height: 1.45,
