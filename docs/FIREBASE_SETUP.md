@@ -107,11 +107,12 @@ x-push-secret: <PUSH_WEBHOOK_SECRET>
 Or point the webhook at the Edge Function URL with body `{ "drain": true }` /
 the inserted `record`.
 
-### Also: Vercel Cron
+### Also: scheduled drain
 
-`admin-web/vercel.json` schedules `GET/POST /api/push/drain` every minute
-(`* * * * *`). Requires a Vercel plan that allows sub-daily crons. Hobby may
-only run daily — use the Database Webhook if so.
+Do **not** put a sub-daily cron in `admin-web/vercel.json` on Hobby — Vercel
+rejects those deploys (`cron_jobs_limits_reached`). Prefer the Database
+Webhook above, an external cron hitting `/api/push/drain`, or a Pro plan
+cron.
 
 Manual test:
 

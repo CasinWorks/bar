@@ -8,11 +8,5 @@
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/push/drain",
-      "schedule": "* * * * *"
-    }
   ]
 }
