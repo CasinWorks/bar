@@ -32,6 +32,59 @@ function isConflictCandidate(event) {
   return Boolean(event.starts_at && event.ends_at);
 }
 
+function normalizeBranch(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** Two nights only clash if they are in the same room — i.e. the same branch. */
+function sameBranch(a, b) {
+  return normalizeBranch(a) === normalizeBranch(b);
+}
+
+async function loadActiveBranches() {
+  const { data, error } = await supabaseAdmin
+    .from('branches')
+    .select('id, slug, name, is_default, sort_order')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Accepts a branch name or slug and returns the canonical branch name. */
+function resolveBranchName(branches, requested) {
+  const query = normalizeBranch(requested);
+  if (!query) return null;
+  const match = branches.find(
+    (branch) =>
+      normalizeBranch(branch.name) === query || normalizeBranch(branch.slug) === query,
+  );
+  return match?.name ?? null;
+}
+
+function branchChoiceError(branches) {
+  if (branches.length === 0) {
+    return {
+      status: 409,
+      body: {
+        error:
+          'No active branch exists yet. Create a branch first, then schedule the event against it.',
+        needsBranchSetup: true,
+      },
+    };
+  }
+  return {
+    status: 400,
+    body: {
+      error: `Select a branch for this event. Active branches: ${branches
+        .map((b) => b.name)
+        .join(', ')}.`,
+      branches: branches.map((b) => ({ slug: b.slug, name: b.name })),
+    },
+  };
+}
+
 async function syncEventStatuses() {
   try {
     await supabaseAdmin.rpc('sync_club_event_runtime_statuses');
@@ -56,6 +109,7 @@ function attachConflicts(events) {
         (other) =>
           other.id !== event.id &&
           isConflictCandidate(other) &&
+          sameBranch(other.branch, event.branch) &&
           windowsOverlap(event.starts_at, event.ends_at, other.starts_at, other.ends_at),
       )
       .map((other) => ({
@@ -122,12 +176,13 @@ async function fetchEventsWithHosts(extra = {}) {
   return attachConflicts(enriched);
 }
 
-async function findConflictsForWindow(startsAt, endsAt, excludeId = null) {
+async function findConflictsForWindow(startsAt, endsAt, excludeId = null, branch = null) {
   const events = await fetchEventsWithHosts();
   return events.filter(
     (other) =>
       other.id !== excludeId &&
       isConflictCandidate(other) &&
+      sameBranch(other.branch, branch) &&
       windowsOverlap(startsAt, endsAt, other.starts_at, other.ends_at),
   );
 }
@@ -165,15 +220,20 @@ router.get('/pending', requireAdmin, requireAdminOnly, async (_req, res) => {
 
 router.get('/conflicts', requireAdmin, async (req, res) => {
   try {
-    const { startsAt, endsAt, excludeId } = req.query;
+    const { startsAt, endsAt, excludeId, branch } = req.query;
     if (!startsAt || !endsAt) {
       return res.status(400).json({ error: 'startsAt and endsAt are required.' });
     }
     if (new Date(endsAt) <= new Date(startsAt)) {
       return res.status(400).json({ error: 'End time must be after start time.' });
     }
-    const conflicts = await findConflictsForWindow(startsAt, endsAt, excludeId || null);
-    res.json({ conflicts, hasConflict: conflicts.length > 0 });
+    const conflicts = await findConflictsForWindow(
+      startsAt,
+      endsAt,
+      excludeId || null,
+      branch || null,
+    );
+    res.json({ conflicts, hasConflict: conflicts.length > 0, branch: branch || null });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -202,10 +262,17 @@ router.post('/', requireAdmin, async (req, res) => {
     : computeLifecycleStatus(startIso, endIso, 'scheduled');
 
   try {
-    const conflicts = await findConflictsForWindow(startIso, endIso);
+    const activeBranches = await loadActiveBranches();
+    const resolvedBranch = resolveBranchName(activeBranches, branch);
+    if (!resolvedBranch) {
+      const err = branchChoiceError(activeBranches);
+      return res.status(err.status).json(err.body);
+    }
+
+    const conflicts = await findConflictsForWindow(startIso, endIso, null, resolvedBranch);
     if (conflicts.length > 0 && !req.body.force) {
       return res.status(409).json({
-        error: 'This event overlaps one or more existing events.',
+        error: 'This event overlaps one or more existing events at the same branch.',
         conflicts,
       });
     }
@@ -215,7 +282,7 @@ router.post('/', requireAdmin, async (req, res) => {
       .insert({
         title,
         description: description || null,
-        branch: branch || 'The Blind Tiger — BGC',
+        branch: resolvedBranch,
         starts_at: startIso,
         ends_at: endIso,
         capacity: capacity ? Number(capacity) : null,
@@ -268,6 +335,7 @@ router.post('/:id/review', requireAdmin, requireAdminOnly, async (req, res) => {
         current.starts_at,
         current.ends_at,
         current.id,
+        current.branch,
       );
       if (conflicts.length > 0 && !force) {
         return res.status(409).json({
@@ -405,17 +473,29 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     patch.ends_at = new Date(patch.ends_at).toISOString();
   }
 
+  const { data: current, error: fetchError } = await supabaseAdmin
+    .from('club_events')
+    .select('starts_at, ends_at, status, branch')
+    .eq('id', req.params.id)
+    .single();
+  if (fetchError) return res.status(404).json({ error: fetchError.message });
+
+  if (patch.branch !== undefined) {
+    const activeBranches = await loadActiveBranches();
+    const resolvedBranch = resolveBranchName(activeBranches, patch.branch);
+    if (!resolvedBranch) {
+      const err = branchChoiceError(activeBranches);
+      return res.status(err.status).json(err.body);
+    }
+    patch.branch = resolvedBranch;
+  }
+
+  const startIso = patch.starts_at ?? current.starts_at;
+  const endIso = patch.ends_at ?? current.ends_at;
+  const branchForConflicts = patch.branch ?? current.branch;
+
   // Validate window when either bound is changing.
   if (patch.starts_at != null || patch.ends_at != null) {
-    const { data: current, error: fetchError } = await supabaseAdmin
-      .from('club_events')
-      .select('starts_at, ends_at, status')
-      .eq('id', req.params.id)
-      .single();
-    if (fetchError) return res.status(500).json({ error: fetchError.message });
-
-    const startIso = patch.starts_at ?? current.starts_at;
-    const endIso = patch.ends_at ?? current.ends_at;
     if (!startIso || !endIso) {
       return res.status(400).json({ error: 'Start and end times are required.' });
     }
@@ -435,10 +515,32 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     }
 
     try {
-      const conflicts = await findConflictsForWindow(startIso, endIso, req.params.id);
+      const conflicts = await findConflictsForWindow(
+        startIso,
+        endIso,
+        req.params.id,
+        branchForConflicts,
+      );
       if (conflicts.length > 0 && !req.body.force) {
         return res.status(409).json({
-          error: 'This event overlaps one or more existing events.',
+          error: 'This event overlaps one or more existing events at the same branch.',
+          conflicts,
+        });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  } else if (patch.branch !== undefined) {
+    try {
+      const conflicts = await findConflictsForWindow(
+        startIso,
+        endIso,
+        req.params.id,
+        branchForConflicts,
+      );
+      if (conflicts.length > 0 && !req.body.force) {
+        return res.status(409).json({
+          error: 'This event overlaps one or more existing events at the same branch.',
           conflicts,
         });
       }
@@ -446,12 +548,6 @@ router.patch('/:id', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
   } else if (patch.status != null && patch.status !== 'cancelled') {
-    const { data: current, error: fetchError } = await supabaseAdmin
-      .from('club_events')
-      .select('starts_at, ends_at')
-      .eq('id', req.params.id)
-      .single();
-    if (fetchError) return res.status(500).json({ error: fetchError.message });
     patch.status = computeLifecycleStatus(
       current.starts_at,
       current.ends_at,

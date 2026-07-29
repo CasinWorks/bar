@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, formatDate } from '../lib/api';
 import EventDateTimePicker from '../components/EventDateTimePicker';
@@ -81,11 +82,12 @@ function ConflictList({ conflicts }) {
   if (!conflicts?.length) return null;
   return (
     <div className="conflict-box">
-      <strong>Conflict{conflicts.length > 1 ? 's' : ''}</strong>
+      <strong>Conflict{conflicts.length > 1 ? 's' : ''} at this branch</strong>
       <ul>
         {conflicts.map((c) => (
           <li key={c.id}>
             {c.title} · {formatWindow(c.starts_at, c.ends_at)}
+            {c.branch ? ` · ${c.branch}` : ''}
             {c.approval_status ? ` · ${approvalLabel(c.approval_status)}` : ''}
           </li>
         ))}
@@ -94,11 +96,42 @@ function ConflictList({ conflicts }) {
   );
 }
 
+function SetupSequence({ hasBranches, branchSelected }) {
+  return (
+    <div className="setup-sequence card">
+      <h3 style={{ marginTop: 0 }}>Event setup sequence</h3>
+      <ol className="setup-steps">
+        <li className={hasBranches ? 'done' : 'current'}>
+          <strong>Create branch</strong>
+          <span>
+            {hasBranches
+              ? 'At least one active branch exists.'
+              : 'Required before you can schedule an event.'}
+          </span>
+        </li>
+        <li className={hasBranches ? (branchSelected ? 'done' : 'current') : ''}>
+          <strong>Schedule event</strong>
+          <span>Select branch, start/end window, then save.</span>
+        </li>
+        <li>
+          <strong>Add / link guests</strong>
+          <span>Guest list attaches to the scheduled event.</span>
+        </li>
+      </ol>
+      {!hasBranches ? (
+        <Link className="btn btn-sm" to="/app/branches">
+          Create your first branch →
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 const emptyForm = {
   title: '',
   startsAt: '',
   endsAt: '',
-  branch: 'The Blind Tiger — BGC',
+  branch: '',
   vipOnly: false,
   cancelled: false,
   force: false,
@@ -106,8 +139,10 @@ const emptyForm = {
 
 export default function EventsPage() {
   const { token } = useAuth();
+  const [searchParams] = useSearchParams();
   const [events, setEvents] = useState([]);
   const [pending, setPending] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -117,6 +152,22 @@ export default function EventsPage() {
   const [formConflicts, setFormConflicts] = useState([]);
   const [err, setErr] = useState('');
   const [okMsg, setOkMsg] = useState('');
+
+  const activeBranches = useMemo(
+    () => branches.filter((branch) => branch.is_active !== false),
+    [branches],
+  );
+
+  const defaultBranchName = useMemo(() => {
+    const fromQuery = searchParams.get('branch');
+    if (fromQuery && activeBranches.some((b) => b.name === fromQuery)) {
+      return fromQuery;
+    }
+    const def = activeBranches.find((b) => b.is_default);
+    return def?.name || activeBranches[0]?.name || '';
+  }, [activeBranches, searchParams]);
+
+  const branchReady = Boolean(form.branch);
 
   const previewStatus = useMemo(
     () => computeLifecycleStatus(form.startsAt, form.endsAt, form.cancelled),
@@ -132,6 +183,7 @@ export default function EventsPage() {
     const keys = new Set();
     for (const ev of events) {
       if (ev.status === 'cancelled' || ev.approval_status === 'rejected') continue;
+      if (form.branch && ev.branch !== form.branch) continue;
       if (!ev.starts_at || !ev.ends_at) continue;
       const start = new Date(ev.starts_at);
       const end = new Date(ev.ends_at);
@@ -144,15 +196,17 @@ export default function EventsPage() {
       }
     }
     return [...keys];
-  }, [events]);
+  }, [events, form.branch]);
 
   async function load() {
-    const [all, pendingRes] = await Promise.all([
+    const [all, pendingRes, branchRes] = await Promise.all([
       api('/api/events', { token }),
       api('/api/events/pending', { token }).catch(() => ({ events: [] })),
+      api('/api/branches/active', { token }).catch(() => ({ branches: [] })),
     ]);
     setEvents(all.events || []);
     setPending(pendingRes.events || []);
+    setBranches(branchRes.branches || []);
   }
 
   useEffect(() => {
@@ -172,14 +226,20 @@ export default function EventsPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!windowValid) {
+    if (editingId) return;
+    if (!defaultBranchName) return;
+    setForm((prev) => (prev.branch ? prev : { ...prev, branch: defaultBranchName }));
+  }, [defaultBranchName, editingId]);
+
+  useEffect(() => {
+    if (!windowValid || !form.branch) {
       setFormConflicts([]);
       return undefined;
     }
     let cancelled = false;
     const startsAt = new Date(form.startsAt).toISOString();
     const endsAt = new Date(form.endsAt).toISOString();
-    const params = new URLSearchParams({ startsAt, endsAt });
+    const params = new URLSearchParams({ startsAt, endsAt, branch: form.branch });
     if (editingId) params.set('excludeId', editingId);
 
     const handle = setTimeout(() => {
@@ -196,11 +256,11 @@ export default function EventsPage() {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [form.startsAt, form.endsAt, editingId, token, windowValid]);
+  }, [form.startsAt, form.endsAt, form.branch, editingId, token, windowValid]);
 
   function resetForm() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, branch: defaultBranchName });
     setFormConflicts([]);
   }
 
@@ -210,7 +270,7 @@ export default function EventsPage() {
       title: ev.title || '',
       startsAt: toLocalInputValue(ev.starts_at),
       endsAt: toLocalInputValue(ev.ends_at) || defaultEndsAt(toLocalInputValue(ev.starts_at)),
-      branch: ev.branch || 'The Blind Tiger — BGC',
+      branch: ev.branch || defaultBranchName,
       vipOnly: Boolean(ev.vip_only),
       cancelled: ev.status === 'cancelled',
       force: false,
@@ -225,6 +285,14 @@ export default function EventsPage() {
 
     if (!form.startsAt || !form.endsAt) {
       setErr('Start and end date/time are required.');
+      return;
+    }
+    if (!form.branch) {
+      setErr('Select a branch for this event.');
+      return;
+    }
+    if (activeBranches.length === 0) {
+      setErr('Create a branch first, then schedule the event.');
       return;
     }
     if (new Date(form.endsAt) <= new Date(form.startsAt)) {
@@ -345,10 +413,26 @@ export default function EventsPage() {
     <>
       <h2 className="page-title">Calendar & Events</h2>
       <p className="page-sub">
-        Pending host requests, conflict checks, and venue calendar — all synced to Supabase
+        Step 2 of event setup — schedule nights against a branch. Conflict checks are scoped per
+        branch.
       </p>
       {err && <p className="error">{err}</p>}
       {okMsg && <p className="success">{okMsg}</p>}
+
+      <SetupSequence hasBranches={activeBranches.length > 0} branchSelected={branchReady} />
+
+      {activeBranches.length === 0 && (
+        <div className="card warning-card">
+          <h3 style={{ marginTop: 0 }}>Create a branch first</h3>
+          <p>
+            Events must be tied to an active branch. Add at least one venue location before
+            scheduling.
+          </p>
+          <Link className="btn btn-sm" to="/app/branches">
+            Go to Branches →
+          </Link>
+        </div>
+      )}
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>
@@ -448,6 +532,11 @@ export default function EventsPage() {
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>{editingId ? 'Edit event' : 'New event'}</h3>
+        {activeBranches.length === 0 ? (
+          <p style={{ color: 'var(--muted)', marginBottom: 0 }}>
+            Event creation is disabled until you create at least one active branch.
+          </p>
+        ) : (
         <form onSubmit={saveEvent}>
           <label>Title</label>
           <input
@@ -488,10 +577,24 @@ export default function EventsPage() {
           )}
           <ConflictList conflicts={formConflicts} />
           <label>Branch</label>
-          <input
+          <select
             value={form.branch}
             onChange={(e) => setForm((f) => ({ ...f, branch: e.target.value }))}
-          />
+            required
+          >
+            <option value="">Select branch…</option>
+            {activeBranches.map((branch) => (
+              <option key={branch.id} value={branch.name}>
+                {branch.name}
+                {branch.is_default ? ' (default)' : ''}
+              </option>
+            ))}
+          </select>
+          {!branchReady ? (
+            <p className="error" style={{ marginTop: -8 }}>
+              Branch is required.
+            </p>
+          ) : null}
           <label>Lifecycle status</label>
           <div
             style={{
@@ -540,7 +643,14 @@ export default function EventsPage() {
             <button
               className="btn"
               type="submit"
-              disabled={!form.startsAt || !form.endsAt || !windowValid || saving}
+              disabled={
+                !form.startsAt ||
+                !form.endsAt ||
+                !form.branch ||
+                !windowValid ||
+                saving ||
+                activeBranches.length === 0
+              }
             >
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create event'}
             </button>
@@ -551,6 +661,7 @@ export default function EventsPage() {
             )}
           </div>
         </form>
+        )}
       </div>
 
       <div className="card">
@@ -559,6 +670,7 @@ export default function EventsPage() {
           <thead>
             <tr>
               <th>Title</th>
+              <th>Branch</th>
               <th>Window</th>
               <th>Host</th>
               <th>Approval</th>
@@ -570,7 +682,7 @@ export default function EventsPage() {
           <tbody>
             {events.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ color: 'var(--muted)' }}>
+                <td colSpan={8} style={{ color: 'var(--muted)' }}>
                   No events yet.
                 </td>
               </tr>
@@ -585,6 +697,7 @@ export default function EventsPage() {
                       </span>
                     ) : null}
                   </td>
+                  <td>{ev.branch || '—'}</td>
                   <td>{formatWindow(ev.starts_at, ev.ends_at)}</td>
                   <td>{ev.host_name || ev.requester_name || '—'}</td>
                   <td>

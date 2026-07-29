@@ -10,7 +10,7 @@ const links = [
   { to: '/app/users', label: 'Members & Access' },
   { to: '/app/events', label: 'Calendar & Events' },
   { to: '/app/guests', label: 'Guest List' },
-  { to: '/app/branches', label: 'Branches · Live Floor' },
+  { to: '/app/branches', label: 'Branches' },
   { to: '/app/safety-social', label: 'Safety & Social' },
   { to: '/app/hr', label: 'HR & Employment' },
 ];
