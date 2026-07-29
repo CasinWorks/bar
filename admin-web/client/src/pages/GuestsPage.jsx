@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 
+const UNLINKED_HINT =
+  'No app account matches this guest email — the event will not appear in their mobile app.';
+
 export default function GuestsPage() {
   const { token } = useAuth();
   const [events, setEvents] = useState([]);
@@ -14,6 +17,7 @@ export default function GuestsPage() {
   const [loading, setLoading] = useState(true);
   const [guestsLoading, setGuestsLoading] = useState(false);
   const [err, setErr] = useState('');
+  const [warning, setWarning] = useState('');
 
   async function refreshGuests(id = eventId) {
     if (!id) {
@@ -68,12 +72,14 @@ export default function GuestsPage() {
   async function addGuest(e) {
     e.preventDefault();
     setErr('');
+    setWarning('');
     try {
-      await api('/api/guests', {
+      const d = await api('/api/guests', {
         method: 'POST',
         token,
         body: { eventId, name, email, phone, plusOnes: Number(plusOnes) },
       });
+      if (d.warning) setWarning(d.warning);
       setName('');
       setEmail('');
       setPhone('');
@@ -88,6 +94,22 @@ export default function GuestsPage() {
     setErr('');
     try {
       await api(`/api/guests/${id}`, { method: 'PATCH', token, body: { status } });
+      await refreshGuests();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  async function relinkGuest(g) {
+    setErr('');
+    setWarning('');
+    try {
+      const d = await api(`/api/guests/${g.id}`, {
+        method: 'PATCH',
+        token,
+        body: { email: g.email || '' },
+      });
+      if (d.warning) setWarning(d.warning);
       await refreshGuests();
     } catch (e) {
       setErr(e.message);
@@ -124,6 +146,7 @@ export default function GuestsPage() {
       <h2 className="page-title">Guest List</h2>
       <p className="page-sub">Door whitelist per event — check-in from admin desk</p>
       {err && <p className="error">{err}</p>}
+      {warning && <p className="error">{warning}</p>}
 
       <div className="toolbar">
         <label>Event</label>
@@ -149,8 +172,13 @@ export default function GuestsPage() {
               <input value={name} onChange={(e) => setName(e.target.value)} required disabled={!eventId} />
             </div>
             <div>
-              <label>Email</label>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={!eventId} />
+              <label>Email (must match their app account)</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={!eventId}
+              />
             </div>
           </div>
           <div className="form-row">
@@ -172,6 +200,10 @@ export default function GuestsPage() {
           <button className="btn" type="submit" disabled={!eventId}>
             Add to guest list
           </button>
+          <p className="page-sub" style={{ marginBottom: 0 }}>
+            The email is how the guest gets linked to their app account. Without a match the
+            guest is door-list only and the event stays invisible in their app.
+          </p>
         </form>
       </div>
 
@@ -188,6 +220,7 @@ export default function GuestsPage() {
                 <th>Name</th>
                 <th>Contact</th>
                 <th>+1</th>
+                <th>App account</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -195,7 +228,7 @@ export default function GuestsPage() {
             <tbody>
               {guests.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ color: 'var(--muted)' }}>
+                  <td colSpan={6} style={{ color: 'var(--muted)' }}>
                     {eventId ? 'No guests on this list yet.' : 'Create an event first.'}
                   </td>
                 </tr>
@@ -206,10 +239,28 @@ export default function GuestsPage() {
                     <td>{g.email || g.phone || '—'}</td>
                     <td>{g.plus_ones}</td>
                     <td>
+                      {g.member_id ? (
+                        <span className="badge">Linked</span>
+                      ) : (
+                        <span className="badge badge-gold" title={UNLINKED_HINT}>
+                          Not in app
+                        </span>
+                      )}
+                    </td>
+                    <td>
                       <span className="badge badge-gold">{g.status}</span>
                     </td>
                     <td>
                       <div className="row-actions">
+                        {!g.member_id && g.email && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => relinkGuest(g)}
+                          >
+                            Link app account
+                          </button>
+                        )}
                         {g.status !== 'checked_in' && (
                           <button
                             type="button"
