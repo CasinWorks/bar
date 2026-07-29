@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import PlatformPage from './pages/PlatformPage';
 import TimeLoadPage from './pages/TimeLoadPage';
+import PackagesPage from './pages/PackagesPage';
 import UsersPage from './pages/UsersPage';
 import EventsPage from './pages/EventsPage';
 import GuestsPage from './pages/GuestsPage';
@@ -52,6 +53,7 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="platform" element={<PlatformPage />} />
             <Route path="time-load" element={<TimeLoadPage />} />
+            <Route path="packages" element={<PackagesPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="events" element={<EventsPage />} />
             <Route path="guests" element={<GuestsPage />} />

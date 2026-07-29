@@ -13,10 +13,31 @@ const BONUS_RULES = [
   { slug: 'special-events', name: 'Special Events', minutes: null },
 ];
 
+function toDeskPackage(row) {
+  if (!row) return null;
+  if (row.peso != null && row.label) return row;
+  const minutes = row.duration_minutes ?? row.minutes ?? null;
+  const drinks = row.included_drinks ?? row.drinks ?? null;
+  const minsLabel = minutes == null ? 'Until closing' : `${minutes} min`;
+  const drinksLabel =
+    drinks == null ? 'drinks incl.' : `${drinks} drink${drinks === 1 ? '' : 's'}`;
+  return {
+    slug: row.slug,
+    name: row.name,
+    peso: Number(row.price_peso ?? row.peso ?? 0),
+    minutes,
+    drinks,
+    target: row.target_guest ?? row.target ?? '',
+    label: row.label || `${minsLabel} · ${drinksLabel}`,
+    popular: Boolean(row.popular),
+  };
+}
+
 export default function TimeLoadPage() {
   const { token } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [loads, setLoads] = useState([]);
+  const [packages, setPackages] = useState(ENTRY_PACKAGES);
   const [recipientId, setRecipientId] = useState('');
   const [selectedSlug, setSelectedSlug] = useState('standard-night');
   const [quantity, setQuantity] = useState(1);
@@ -32,17 +53,29 @@ export default function TimeLoadPage() {
   const [bonusRecipient, setBonusRecipient] = useState('');
 
   const preview = useMemo(
-    () => previewLoad(selectedSlug, quantity, paymentMethod),
-    [selectedSlug, quantity, paymentMethod],
+    () => previewLoad(selectedSlug, quantity, paymentMethod, packages),
+    [selectedSlug, quantity, paymentMethod, packages],
   );
 
   async function refresh() {
-    const [u, l] = await Promise.all([
+    const [u, l, p] = await Promise.all([
       api('/api/users?loadable=true', { token }),
       api('/api/time-loads', { token }),
+      api('/api/packages/active', { token }).catch(() =>
+        api('/api/time-loads/packages', { token }),
+      ),
     ]);
     setAccounts(u.users);
     setLoads(l.loads);
+    const nextPackages = (p.packages ?? []).map(toDeskPackage).filter(Boolean);
+    if (nextPackages.length) {
+      setPackages(nextPackages);
+      setSelectedSlug((prev) =>
+        nextPackages.some((pkg) => pkg.slug === prev)
+          ? prev
+          : nextPackages.find((pkg) => pkg.popular)?.slug || nextPackages[0].slug,
+      );
+    }
   }
 
   useEffect(() => {
@@ -165,7 +198,7 @@ export default function TimeLoadPage() {
 
           <label>Entry package</label>
           <div className="bill-grid">
-            {ENTRY_PACKAGES.map((pkg) => (
+            {packages.map((pkg) => (
               <button
                 key={pkg.slug}
                 type="button"

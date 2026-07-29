@@ -57,8 +57,23 @@ async function fetchTimeLoads() {
   };
 }
 
-router.get('/packages', requireAdmin, (_req, res) => {
-  res.json({ packages: ENTRY_PACKAGES });
+async function fetchActivePackagesCatalog() {
+  const { data, error } = await supabaseAdmin
+    .from('time_packages')
+    .select(
+      'id, slug, name, price_peso, duration_minutes, included_drinks, target_guest, tagline, popular, sort_order, active',
+    )
+    .eq('active', true)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (error || !data?.length) return ENTRY_PACKAGES;
+  return data;
+}
+
+router.get('/packages', requireAdmin, async (_req, res) => {
+  const packages = await fetchActivePackagesCatalog();
+  res.json({ packages });
 });
 
 router.get('/', requireAdmin, async (req, res) => {
@@ -82,12 +97,14 @@ router.post('/', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Select an account.' });
   }
 
+  const catalog = await fetchActivePackagesCatalog();
   const resolved = resolveLoad({
     packageSlug,
     amountPeso,
     billCount,
     quantity,
     paymentMethod: paymentMethod || 'cash',
+    catalog,
   });
 
   if (resolved.error) {

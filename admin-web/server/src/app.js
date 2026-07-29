@@ -9,6 +9,7 @@ import employeesRoutes from './routes/employees.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import safetySocialRoutes from './routes/safetySocial.js';
 import branchesRoutes from './routes/branches.js';
+import packagesRoutes from './routes/packages.js';
 import pushRoutes from './routes/push.js';
 
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/employees', employeesRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/safety-social', safetySocialRoutes);
 app.use('/api/branches', branchesRoutes);
+app.use('/api/packages', packagesRoutes);
 app.use('/api/push', pushRoutes);
 
 app.use((err, _req, res, _next) => {

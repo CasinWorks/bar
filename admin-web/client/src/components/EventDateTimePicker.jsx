@@ -42,7 +42,18 @@ function startOfDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-export default function EventDateTimePicker({ value, onChange, required }) {
+export default function EventDateTimePicker({
+  value,
+  onChange,
+  required,
+  timeLabel = 'Start time',
+  allowPast = false,
+  busyDates = [],
+}) {
+  const busySet = useMemo(
+    () => new Set(Array.isArray(busyDates) ? busyDates : [...busyDates]),
+    [busyDates],
+  );
   const parsed = parseValue(value);
   const today = startOfDay(new Date());
 
@@ -78,7 +89,7 @@ export default function EventDateTimePicker({ value, onChange, required }) {
   }
 
   function pickDate(date) {
-    if (startOfDay(date) < today) return;
+    if (!allowPast && startOfDay(date) < today) return;
     emit(date, selectedTime);
     setViewYear(date.getFullYear());
     setViewMonth(date.getMonth());
@@ -135,26 +146,31 @@ export default function EventDateTimePicker({ value, onChange, required }) {
           {cells.map((date, i) => {
             if (!date) return <span key={`empty-${i}`} className="dtp-day empty" />;
 
-            const isPast = startOfDay(date) < today;
+            const isPast = !allowPast && startOfDay(date) < today;
             const isToday = startOfDay(date).getTime() === today.getTime();
             const isSelected =
               selectedDate &&
               startOfDay(date).getTime() === startOfDay(selectedDate).getTime();
+            const dateKey = toLocalDateValue(date);
+            const hasEvent = busySet.has(dateKey);
 
             return (
               <button
                 key={date.toISOString()}
                 type="button"
+                title={hasEvent ? 'Event already booked this day' : undefined}
                 className={[
                   'dtp-day',
                   isPast ? 'past' : '',
                   isToday ? 'today' : '',
                   isSelected ? 'selected' : '',
+                  hasEvent ? 'busy' : '',
                 ].filter(Boolean).join(' ')}
                 disabled={isPast}
                 onClick={() => pickDate(date)}
               >
                 {date.getDate()}
+                {hasEvent ? <span className="dtp-busy-dot" aria-hidden /> : null}
               </button>
             );
           })}
@@ -162,7 +178,7 @@ export default function EventDateTimePicker({ value, onChange, required }) {
       </div>
 
       <div className="dtp-time">
-        <span className="dtp-time-label">Start time</span>
+        <span className="dtp-time-label">{timeLabel}</span>
         <div className="dtp-time-presets">
           {TIME_PRESETS.map((preset) => (
             <button

@@ -1,4 +1,7 @@
-/** Entry packages — must match Flutter ClubPackages + server timePricing.js */
+/**
+ * Fallback entry packages when the admin API / `time_packages` is unreachable.
+ * Canonical source of truth is Supabase `time_packages`.
+ */
 export const ENTRY_PACKAGES = [
   {
     slug: 'quick-escape',
@@ -48,21 +51,29 @@ export const CASH_PACKAGES = ENTRY_PACKAGES.map((p) => ({
   drinks: p.drinks,
 }));
 
-export function packageForSlug(slug) {
-  return ENTRY_PACKAGES.find((p) => p.slug === slug) ?? null;
+export function packageForSlug(slug, catalog = ENTRY_PACKAGES) {
+  return (catalog?.length ? catalog : ENTRY_PACKAGES).find((p) => p.slug === slug) ?? null;
 }
 
-export function packageForPeso(peso) {
-  return ENTRY_PACKAGES.find((p) => p.peso === Number(peso)) ?? null;
+export function packageForPeso(peso, catalog = ENTRY_PACKAGES) {
+  return (
+    (catalog?.length ? catalog : ENTRY_PACKAGES).find((p) => p.peso === Number(peso)) ??
+    null
+  );
 }
 
-export function previewLoad(packageSlug, quantity = 1, paymentMethod = 'cash') {
-  const pkg = packageForSlug(packageSlug) ?? packageForPeso(packageSlug);
+export function previewLoad(
+  packageSlug,
+  quantity = 1,
+  paymentMethod = 'cash',
+  catalog = ENTRY_PACKAGES,
+) {
+  const pkg =
+    packageForSlug(packageSlug, catalog) ?? packageForPeso(packageSlug, catalog);
   if (!pkg) return null;
   const count = Math.max(1, Number(quantity) || 1);
   const minutes = (pkg.minutes ?? 480) * count;
-  const drinks =
-    pkg.drinks == null ? null : pkg.drinks * count;
+  const drinks = pkg.drinks == null ? null : pkg.drinks * count;
   return {
     slug: pkg.slug,
     name: pkg.name,

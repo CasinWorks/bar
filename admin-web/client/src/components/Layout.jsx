@@ -6,6 +6,7 @@ const links = [
   { to: '/app', label: 'Dashboard', end: true },
   { to: '/app/platform', label: 'Platform & Revenue' },
   { to: '/app/time-load', label: 'Load Package' },
+  { to: '/app/packages', label: 'Entry Packages' },
   { to: '/app/users', label: 'Members & Access' },
   { to: '/app/events', label: 'Calendar & Events' },
   { to: '/app/guests', label: 'Guest List' },

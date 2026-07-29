@@ -4,14 +4,6 @@ import { requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
-/** Known club branches (match Flutter MockData.clubBranches display names). */
-const KNOWN_BRANCHES = [
-  { id: 'bgc', name: 'BGC Secret Cellar', city: 'Taguig' },
-  { id: 'poblacion', name: 'Poblacion Velvet Room', city: 'Makati' },
-  { id: 'glasshouse', name: 'Makati Glasshouse', city: 'Makati' },
-  { id: 'tomas', name: 'Tomas Morato Lounge', city: 'Quezon City' },
-];
-
 const LIVE_PHASES = ['inside_club', 'awaiting_exit_scan'];
 
 function formatGuest(row, profile) {
@@ -32,6 +24,15 @@ function formatGuest(row, profile) {
 
 router.get('/live', requireAdmin, async (_req, res) => {
   try {
+    const { data: configuredBranches, error: branchError } = await supabaseAdmin
+      .from('branches')
+      .select('id, slug, name, city')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (branchError) throw branchError;
+
     const { data: sessions, error } = await supabaseAdmin
       .from('club_sessions')
       .select(
@@ -56,11 +57,11 @@ router.get('/live', requireAdmin, async (_req, res) => {
     }
 
     const byBranch = new Map();
-    for (const known of KNOWN_BRANCHES) {
-      byBranch.set(known.name, {
-        id: known.id,
-        name: known.name,
-        city: known.city,
+    for (const branch of configuredBranches ?? []) {
+      byBranch.set(branch.name, {
+        id: branch.slug || branch.id,
+        name: branch.name,
+        city: branch.city || '',
         count: 0,
         guests: [],
       });
@@ -82,11 +83,10 @@ router.get('/live', requireAdmin, async (_req, res) => {
       bucket.count = bucket.guests.length;
     }
 
-    // Known branches first (even if empty), then any extras.
-    const knownNames = new Set(KNOWN_BRANCHES.map((b) => b.name));
+    const configuredNames = new Set((configuredBranches ?? []).map((branch) => branch.name));
     const branches = [
-      ...KNOWN_BRANCHES.map((b) => byBranch.get(b.name)),
-      ...[...byBranch.values()].filter((b) => !knownNames.has(b.name)),
+      ...(configuredBranches ?? []).map((branch) => byBranch.get(branch.name)),
+      ...[...byBranch.values()].filter((branch) => !configuredNames.has(branch.name)),
     ];
 
     const awaitingEntry = await supabaseAdmin

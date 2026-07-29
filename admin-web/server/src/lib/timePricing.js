@@ -1,4 +1,7 @@
-/** Entry packages — must match admin client + Flutter ClubPackages. */
+/**
+ * Fallback entry packages when `time_packages` is empty/unreachable.
+ * Canonical source of truth is Supabase `time_packages` (migration 020/030).
+ */
 export const ENTRY_PACKAGES = [
   {
     slug: 'quick-escape',
@@ -49,12 +52,47 @@ export const CASH_PACKAGES = ENTRY_PACKAGES.map((p) => ({
 
 export const ALLOWED_BILL_PESO = ENTRY_PACKAGES.map((p) => p.peso);
 
-export function packageForSlug(slug) {
-  return ENTRY_PACKAGES.find((p) => p.slug === slug) ?? null;
+/** Normalize a DB `time_packages` row (or fallback entry) into resolveLoad shape. */
+export function normalizePackage(row) {
+  if (!row) return null;
+  if (row.peso != null && row.minutes !== undefined) {
+    return {
+      slug: row.slug,
+      name: row.name,
+      peso: Number(row.peso),
+      minutes: row.minutes == null ? null : Number(row.minutes),
+      drinks: row.drinks == null ? null : Number(row.drinks),
+      target: row.target ?? row.target_guest ?? null,
+      popular: Boolean(row.popular),
+      label: row.label,
+    };
+  }
+  return {
+    slug: row.slug,
+    name: row.name,
+    peso: Number(row.price_peso ?? row.peso ?? 0),
+    minutes:
+      row.duration_minutes == null && row.minutes === undefined
+        ? null
+        : Number(row.duration_minutes ?? row.minutes),
+    drinks:
+      row.included_drinks == null && row.drinks === undefined
+        ? null
+        : Number(row.included_drinks ?? row.drinks),
+    target: row.target_guest ?? row.target ?? null,
+    popular: Boolean(row.popular),
+    label: row.label,
+  };
 }
 
-export function packageForPeso(peso) {
-  return ENTRY_PACKAGES.find((p) => p.peso === Number(peso)) ?? null;
+export function packageForSlug(slug, catalog = ENTRY_PACKAGES) {
+  return catalog.map(normalizePackage).find((p) => p?.slug === slug) ?? null;
+}
+
+export function packageForPeso(peso, catalog = ENTRY_PACKAGES) {
+  return (
+    catalog.map(normalizePackage).find((p) => p?.peso === Number(peso)) ?? null
+  );
 }
 
 export function resolveLoad({
@@ -63,11 +101,12 @@ export function resolveLoad({
   billCount = 1,
   quantity,
   paymentMethod = 'cash',
+  catalog = ENTRY_PACKAGES,
 }) {
   const qty = Math.max(1, Math.min(10, Number(quantity ?? billCount) || 1));
+  const list = (catalog?.length ? catalog : ENTRY_PACKAGES).map(normalizePackage);
   const pkg =
-    packageForSlug(packageSlug) ||
-    packageForPeso(amountPeso);
+    packageForSlug(packageSlug, list) || packageForPeso(amountPeso, list);
 
   if (!pkg) {
     return {
@@ -79,8 +118,7 @@ export function resolveLoad({
   const minutesEach = pkg.minutes ?? 480;
   const totalMinutes = minutesEach * qty;
   const totalPeso = paymentMethod === 'complimentary' ? 0 : pkg.peso * qty;
-  const drinks =
-    pkg.drinks == null ? null : pkg.drinks * qty;
+  const drinks = pkg.drinks == null ? null : pkg.drinks * qty;
 
   return {
     pkg,
