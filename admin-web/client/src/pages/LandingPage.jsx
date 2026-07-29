@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
@@ -18,13 +18,53 @@ function prefersFastMobileScroll() {
 export default function LandingPage() {
   const rootRef = useRef(null);
   const lenisRef = useRef(null);
+  const mobileMenuButtonRef = useRef(null);
+  const mobileNavRef = useRef(null);
   const mvpClicksRef = useRef(0);
   const mvpClickTimerRef = useRef(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { profile } = useAuth();
 
   useEffect(() => {
     document.documentElement.classList.add('lp-scroll-lock');
     return () => document.documentElement.classList.remove('lp-scroll-lock');
+  }, []);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+
+    mobileNavRef.current?.querySelector('a')?.focus();
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      setMobileNavOpen(false);
+      mobileMenuButtonRef.current?.focus();
+    };
+    const onPointerDown = (event) => {
+      if (
+        mobileNavRef.current?.contains(event.target)
+        || mobileMenuButtonRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+      setMobileNavOpen(false);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [mobileNavOpen]);
+
+  useEffect(() => {
+    const desktopQuery = window.matchMedia('(min-width: 761px)');
+    const closeOnDesktop = (event) => {
+      if (event.matches) setMobileNavOpen(false);
+    };
+
+    desktopQuery.addEventListener('change', closeOnDesktop);
+    return () => desktopQuery.removeEventListener('change', closeOnDesktop);
   }, []);
 
   useEffect(() => {
@@ -306,6 +346,7 @@ export default function LandingPage() {
 
   function scrollToSection(e, id = 'suite') {
     e.preventDefault();
+    setMobileNavOpen(false);
     const target = document.getElementById(id);
     if (!target) return;
     if (lenisRef.current) {
@@ -333,14 +374,32 @@ export default function LandingPage() {
       <div className="lp-glow lp-glow-a" aria-hidden />
       <div className="lp-glow lp-glow-b" aria-hidden />
 
-      <header className="lp-nav">
+      <header className={`lp-nav${mobileNavOpen ? ' lp-nav--open' : ''}`}>
         <div className="lp-brand">
           <span className="lp-mark" aria-hidden>
             虎
           </span>
           <span>BLIND TIGER</span>
         </div>
-        <nav className="lp-nav-links">
+        <button
+          ref={mobileMenuButtonRef}
+          type="button"
+          className="lp-menu-btn"
+          aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileNavOpen}
+          aria-controls="landing-navigation"
+          onClick={() => setMobileNavOpen((open) => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <nav
+          ref={mobileNavRef}
+          className="lp-nav-links"
+          id="landing-navigation"
+          aria-label="Main navigation"
+        >
           <a href="#flow" onClick={(e) => scrollToSection(e, 'flow')}>
             THE FLOW
           </a>
@@ -355,6 +414,15 @@ export default function LandingPage() {
           </a>
         </nav>
       </header>
+      <button
+        type="button"
+        className={`lp-nav-backdrop${mobileNavOpen ? ' is-open' : ''}`}
+        aria-label="Close navigation menu"
+        onClick={() => {
+          setMobileNavOpen(false);
+          mobileMenuButtonRef.current?.focus();
+        }}
+      />
 
       <section className="lp-hero-pin">
         <div className="lp-hero">

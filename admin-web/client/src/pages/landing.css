@@ -131,6 +131,17 @@
   color: var(--lp-gold-bright);
 }
 
+.lp-menu-btn,
+.lp-nav-backdrop {
+  display: none;
+}
+
+.lp-menu-btn:focus-visible,
+.lp-nav-links a:focus-visible {
+  outline: 2px solid var(--lp-gold-bright);
+  outline-offset: 3px;
+}
+
 .lp-hero-pin {
   position: relative;
   z-index: 1;
@@ -1373,6 +1384,119 @@ html.lp-scroll-lock body {
   .lp-float-card,
   .lp-dash-preview {
     backdrop-filter: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .lp-nav {
+    align-items: center;
+    gap: 12px;
+    padding: 12px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+    background: linear-gradient(180deg, rgba(5, 2, 0, 0.98), rgba(5, 2, 0, 0.9));
+    border-bottom: 1px solid rgba(197, 160, 89, 0.18);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
+  }
+
+  .lp-brand {
+    min-width: 0;
+    gap: 9px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+  }
+
+  .lp-mark {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+  }
+
+  .lp-menu-btn {
+    appearance: none;
+    display: grid;
+    place-items: center;
+    gap: 4px;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    padding: 10px;
+    border: 1px solid rgba(197, 160, 89, 0.34);
+    border-radius: 12px;
+    background: rgba(18, 10, 0, 0.88);
+    cursor: pointer;
+  }
+
+  .lp-menu-btn span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--lp-gold-bright);
+    transition: transform 0.18s ease, opacity 0.18s ease;
+  }
+
+  .lp-nav--open .lp-menu-btn span:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+  }
+
+  .lp-nav--open .lp-menu-btn span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .lp-nav--open .lp-menu-btn span:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  .lp-nav-links {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: max(12px, env(safe-area-inset-right));
+    display: none;
+    width: min(340px, calc(100vw - 24px));
+    max-height: calc(100dvh - 86px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 10px;
+    border: 1px solid rgba(197, 160, 89, 0.28);
+    border-radius: 16px;
+    background:
+      linear-gradient(145deg, rgba(229, 193, 128, 0.06), transparent 42%),
+      rgba(12, 6, 0, 0.98);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+  }
+
+  .lp-nav--open .lp-nav-links {
+    display: flex;
+  }
+
+  .lp-nav-links a {
+    width: 100%;
+    padding: 14px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+  }
+
+  .lp-nav-links a:hover,
+  .lp-nav-links a:focus-visible {
+    color: var(--lp-gold-bright);
+    background: rgba(197, 160, 89, 0.1);
+  }
+
+  .lp-nav-backdrop.is-open {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgba(0, 0, 0, 0.58);
+    backdrop-filter: blur(2px);
+    cursor: default;
   }
 }
 
