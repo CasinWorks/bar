@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/app_state.dart';
+import 'root_overlay_context.dart';
 import 'time_refill_overlay.dart';
 
 /// Global host — plays the cash-desk “time landed” celebration on any screen.
@@ -31,7 +32,8 @@ class _WalletCreditCelebrationHostState
         }
 
         final pending = app.pendingWalletCredit;
-        final isNew = pending != null &&
+        final isNew =
+            pending != null &&
             (pending.fromSeconds != _lastShown?.fromSeconds ||
                 pending.toSeconds != _lastShown?.toSeconds);
         if (pending != null &&
@@ -53,6 +55,7 @@ class _WalletCreditCelebrationHostState
     PendingWalletCredit pending,
   ) async {
     if (!mounted || _showing) return;
+    if (rootOverlayContext(context) == null) return;
     _showing = true;
     _lastShown = pending;
     app.clearPendingWalletCredit();
@@ -65,9 +68,14 @@ class _WalletCreditCelebrationHostState
       _showing = false;
       return;
     }
+    final navContext = rootOverlayContext(context);
+    if (navContext == null) {
+      _showing = false;
+      return;
+    }
 
     await TimeRefillOverlay.show(
-      context,
+      navContext,
       fromSeconds: pending.fromSeconds,
       toSeconds: pending.toSeconds,
       title: pending.title ?? 'TIME LANDED',

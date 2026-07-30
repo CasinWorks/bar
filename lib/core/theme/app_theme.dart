@@ -4,14 +4,13 @@ import 'app_colors.dart';
 
 abstract final class AppTheme {
   static TextStyle get _display => GoogleFonts.raleway(
-        fontWeight: FontWeight.w700,
-        letterSpacing: 2,
-        color: AppColors.textLight,
-      );
+    fontWeight: FontWeight.w700,
+    letterSpacing: 2,
+    color: AppColors.textLight,
+  );
 
-  static TextStyle get _body => GoogleFonts.montserrat(
-        color: AppColors.textLight,
-      );
+  static TextStyle get _body =>
+      GoogleFonts.montserrat(color: AppColors.textLight);
 
   static ThemeData get dark {
     return ThemeData(
@@ -28,10 +27,22 @@ abstract final class AppTheme {
         error: AppColors.dangerRed,
       ),
       textTheme: TextTheme(
-        displayLarge: _display.copyWith(fontSize: 52, fontWeight: FontWeight.w800),
-        displayMedium: _display.copyWith(fontSize: 32, fontWeight: FontWeight.w800),
-        headlineLarge: _display.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
-        headlineMedium: _display.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
+        displayLarge: _display.copyWith(
+          fontSize: 52,
+          fontWeight: FontWeight.w800,
+        ),
+        displayMedium: _display.copyWith(
+          fontSize: 32,
+          fontWeight: FontWeight.w800,
+        ),
+        headlineLarge: _display.copyWith(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+        ),
+        headlineMedium: _display.copyWith(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
         titleLarge: _body.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
         titleMedium: _body.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
         bodyLarge: _body.copyWith(fontSize: 14),
@@ -53,7 +64,10 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.charcoal,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.darkSteel),

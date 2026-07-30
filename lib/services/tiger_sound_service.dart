@@ -35,13 +35,20 @@ class TigerSoundService {
     if (on) await playKnock();
   }
 
-  Future<void> playKnock() => _play('sounds/velvet_knock.wav', HapticFeedback.mediumImpact);
-  Future<void> playDoorLatch() => _play('sounds/door_latch.wav', HapticFeedback.heavyImpact);
-  Future<void> playCheckoutChime() => _play('sounds/checkout_chime.wav', HapticFeedback.mediumImpact);
-  Future<void> playTimePour() => _play('sounds/time_pour.wav', HapticFeedback.heavyImpact);
-  Future<void> playGlassClink() => _play('sounds/glass_clink.wav', HapticFeedback.lightImpact);
-  Future<void> playSoftThud() => _play('sounds/soft_thud.wav', HapticFeedback.heavyImpact);
-  Future<void> playTimerLow() => _play('sounds/timer_low.wav', HapticFeedback.selectionClick);
+  Future<void> playKnock() =>
+      _play('sounds/velvet_knock.wav', HapticFeedback.mediumImpact);
+  Future<void> playDoorLatch() =>
+      _play('sounds/door_latch.wav', HapticFeedback.heavyImpact);
+  Future<void> playCheckoutChime() =>
+      _play('sounds/checkout_chime.wav', HapticFeedback.mediumImpact);
+  Future<void> playTimePour() =>
+      _play('sounds/time_pour.wav', HapticFeedback.heavyImpact);
+  Future<void> playGlassClink() =>
+      _play('sounds/glass_clink.wav', HapticFeedback.lightImpact);
+  Future<void> playSoftThud() =>
+      _play('sounds/soft_thud.wav', HapticFeedback.heavyImpact);
+  Future<void> playTimerLow() =>
+      _play('sounds/timer_low.wav', HapticFeedback.selectionClick);
 
   Future<void> _play(String asset, Future<void> Function() haptic) async {
     await ensureLoaded();

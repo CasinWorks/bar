@@ -174,8 +174,8 @@ class GoldGradientText extends StatelessWidget {
       child: Text(
         text,
         style: (style ?? Theme.of(context).textTheme.headlineLarge)?.copyWith(
-              color: Colors.white,
-            ),
+          color: Colors.white,
+        ),
       ),
     );
   }
@@ -205,9 +205,7 @@ class LuxuryCard extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: highlighted
-              ? AppColors.tigerRed
-              : AppColors.darkSteel,
+          color: highlighted ? AppColors.tigerRed : AppColors.darkSteel,
           width: highlighted ? 1.5 : 1,
         ),
         boxShadow: highlighted
@@ -274,7 +272,9 @@ class TigerButton extends StatelessWidget {
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             foregroundColor: AppColors.offWhite,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           child: isLoading
               ? const SizedBox(
@@ -288,7 +288,10 @@ class TigerButton extends StatelessWidget {
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 6)],
+                    if (icon != null) ...[
+                      Icon(icon, size: 18),
+                      const SizedBox(width: 6),
+                    ],
                     Text(
                       label,
                       style: const TextStyle(

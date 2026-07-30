@@ -46,9 +46,10 @@ class _TimeTransferOverlayState extends State<TimeTransferOverlay>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _pulseAnim = Tween(begin: 0.85, end: 1.08).animate(
-      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-    );
+    _pulseAnim = Tween(
+      begin: 0.85,
+      end: 1.08,
+    ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
 
     _fly = AnimationController(
       vsync: this,
@@ -109,10 +110,10 @@ class _TimeTransferOverlayState extends State<TimeTransferOverlay>
                       Text(
                         widget.title,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              letterSpacing: 2,
-                              color: AppColors.goldBright,
-                              fontSize: 10,
-                            ),
+                          letterSpacing: 2,
+                          color: AppColors.goldBright,
+                          fontSize: 10,
+                        ),
                       ),
                       const SizedBox(height: 28),
                       Row(
@@ -161,7 +162,10 @@ class _TimeTransferOverlayState extends State<TimeTransferOverlay>
                 ),
                 ...List.generate(6, (i) {
                   final stagger = (i / 6);
-                  final t = ((_flyProgress.value - stagger * 0.35).clamp(0.0, 1.0));
+                  final t = ((_flyProgress.value - stagger * 0.35).clamp(
+                    0.0,
+                    1.0,
+                  ));
                   if (t <= 0) return const SizedBox.shrink();
                   final start = Offset(size.width * 0.22, size.height * 0.42);
                   final end = Offset(size.width * 0.78, size.height * 0.42);
@@ -176,13 +180,18 @@ class _TimeTransferOverlayState extends State<TimeTransferOverlay>
                     child: Opacity(
                       opacity: (1 - (t - 0.7).clamp(0.0, 1.0) / 0.3),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.goldBrushed.withValues(alpha: 0.9),
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.goldBright.withValues(alpha: 0.5),
+                              color: AppColors.goldBright.withValues(
+                                alpha: 0.5,
+                              ),
                               blurRadius: 12,
                             ),
                           ],
@@ -235,7 +244,10 @@ class _Node extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: accent, width: 3),
               boxShadow: [
-                BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 24),
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.35),
+                  blurRadius: 24,
+                ),
               ],
               gradient: const LinearGradient(
                 colors: [Color(0xFF1C0F00), Color(0xFF050000)],

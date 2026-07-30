@@ -160,11 +160,15 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
             const SizedBox(height: 16),
             Text(
               'PASS THE GLASS',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontSize: 18),
             ),
             Text(
               'Time is social currency — raise a toast, tip the house, or claim a glass.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11),
             ),
             const SizedBox(height: 8),
             Text(
@@ -173,7 +177,10 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
                 color: AppColors.timerNeon,
                 fontWeight: FontWeight.w900,
                 fontSize: 12,
-                shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.5),
+                shadows: AppColors.timerGlow(
+                  AppColors.timerNeon,
+                  intensity: 0.5,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -217,16 +224,22 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
               ],
             ),
             const SizedBox(height: 16),
-            if (_raised != null) _RaisedCodeCard(gift: _raised!) else ...[
+            if (_raised != null)
+              _RaisedCodeCard(gift: _raised!)
+            else ...[
               if (_tab == _GlassTab.raise) ...[
                 Text(
                   'RAISE A TOAST',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontSize: 9),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Lock minutes into a glass code. Read it to a friend — they claim it and stay longer.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                 ),
                 const SizedBox(height: 12),
                 ...GlassPours.toast.map(
@@ -245,7 +258,13 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
                   ),
                 ),
                 if (_error != null) ...[
-                  Text(_error!, style: const TextStyle(color: AppColors.dangerRed, fontSize: 11)),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: AppColors.dangerRed,
+                      fontSize: 11,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                 ],
                 TigerButton(
@@ -258,12 +277,16 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
               if (_tab == _GlassTab.tip) ...[
                 Text(
                   'TIP THE HOUSE',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontSize: 9),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Thank bartenders & staff with minutes from your night. It burns bright — social status, not a receipt.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                 ),
                 const SizedBox(height: 12),
                 ...GlassPours.tips.map(
@@ -282,7 +305,13 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
                   ),
                 ),
                 if (_error != null) ...[
-                  Text(_error!, style: const TextStyle(color: AppColors.dangerRed, fontSize: 11)),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: AppColors.dangerRed,
+                      fontSize: 11,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                 ],
                 TigerButton(
@@ -295,12 +324,16 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
               if (_tab == _GlassTab.claim) ...[
                 Text(
                   'CLAIM A GLASS',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontSize: 9),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Someone raised a toast for you. Enter the code they shared — minutes refill your account.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -313,7 +346,13 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
                 ),
                 const SizedBox(height: 12),
                 if (_error != null) ...[
-                  Text(_error!, style: const TextStyle(color: AppColors.dangerRed, fontSize: 11)),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: AppColors.dangerRed,
+                      fontSize: 11,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                 ],
                 TigerButton(
@@ -357,7 +396,9 @@ class _TabChip extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: selected ? AppColors.goldBrushed : AppColors.neutral900,
+                  color: selected
+                      ? AppColors.goldBrushed
+                      : AppColors.neutral900,
                 ),
                 color: selected
                     ? AppColors.goldBrushed.withValues(alpha: 0.15)
@@ -412,18 +453,25 @@ class _PourTile extends StatelessWidget {
                     children: [
                       Text(
                         '${pour.minutes} MIN · ${pour.label}',
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
                       ),
                       Text(
                         pour.tagline,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                       ),
                     ],
                   ),
                 ),
                 Icon(
                   selected ? Icons.check_circle : Icons.circle_outlined,
-                  color: selected ? AppColors.goldBrushed : AppColors.neutral500,
+                  color: selected
+                      ? AppColors.goldBrushed
+                      : AppColors.neutral500,
                   size: 18,
                 ),
               ],
@@ -453,9 +501,9 @@ class _RaisedCodeCard extends StatelessWidget {
           Text(
             'TOAST RAISED',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.successGreen,
-                  letterSpacing: 2,
-                ),
+              color: AppColors.successGreen,
+              letterSpacing: 2,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -476,7 +524,9 @@ class _RaisedCodeCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Whisper or flash this code — once claimed, it\'s gone.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontSize: 10),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),

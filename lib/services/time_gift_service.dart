@@ -12,13 +12,9 @@ class TimeGiftException implements Exception {
 class TimeGiftService {
   bool get usesCloud => SupabaseConfig.isConfigured;
 
-  SupabaseClient? get _client =>
-      usesCloud ? Supabase.instance.client : null;
+  SupabaseClient? get _client => usesCloud ? Supabase.instance.client : null;
 
-  Future<TimeGift> raiseToast({
-    required int seconds,
-    String? message,
-  }) async {
+  Future<TimeGift> raiseToast({required int seconds, String? message}) async {
     if (!usesCloud) {
       return TimeGift(
         id: 'local-${DateTime.now().millisecondsSinceEpoch}',
@@ -27,7 +23,8 @@ class TimeGiftService {
         seconds: seconds,
         kind: TimeGiftKind.toast,
         status: TimeGiftStatus.pending,
-        code: 'GLASS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        code:
+            'GLASS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
         message: message,
         createdAt: DateTime.now(),
       );
@@ -36,10 +33,7 @@ class TimeGiftService {
     try {
       final row = await _client!.rpc(
         'raise_a_toast',
-        params: {
-          'p_seconds': seconds,
-          'p_message': message,
-        },
+        params: {'p_seconds': seconds, 'p_message': message},
       );
       return TimeGift.fromSupabaseRow(Map<String, dynamic>.from(row as Map));
     } catch (e) {
@@ -47,10 +41,7 @@ class TimeGiftService {
     }
   }
 
-  Future<TimeGift> tipHouse({
-    required int seconds,
-    String? message,
-  }) async {
+  Future<TimeGift> tipHouse({required int seconds, String? message}) async {
     if (!usesCloud) {
       return TimeGift(
         id: 'local-tip-${DateTime.now().millisecondsSinceEpoch}',
@@ -67,10 +58,7 @@ class TimeGiftService {
     try {
       final row = await _client!.rpc(
         'tip_the_house',
-        params: {
-          'p_seconds': seconds,
-          'p_message': message,
-        },
+        params: {'p_seconds': seconds, 'p_message': message},
       );
       return TimeGift.fromSupabaseRow(Map<String, dynamic>.from(row as Map));
     } catch (e) {
@@ -138,10 +126,12 @@ class TimeGiftService {
     if (message.contains('already claimed') || message.contains('not found')) {
       return 'That glass was already claimed or the code is invalid.';
     }
-    if (message.contains('your own toast') || message.contains('tip yourself')) {
+    if (message.contains('your own toast') ||
+        message.contains('tip yourself')) {
       return 'You can\'t tip or claim your own pad.';
     }
-    if (message.contains('Bartender tip pad') || message.contains('not found')) {
+    if (message.contains('Bartender tip pad') ||
+        message.contains('not found')) {
       return 'Tip pad not found — ask the bartender to show their pad again.';
     }
     if (message.contains('Minimum')) {

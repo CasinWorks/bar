@@ -8,12 +8,17 @@ import '../screens/auth/signup_screen.dart';
 import '../screens/auth/verify_email_screen.dart';
 import '../screens/legal/legal_document_screen.dart';
 import '../screens/auth/welcome_screen.dart';
+import '../models/event_models.dart';
+import '../screens/events/event_guest_pass_screen.dart';
+import '../screens/events/event_hub_screen.dart';
+import '../screens/events/event_invite_screen.dart';
 import '../screens/gate/entry_exit_gate_screen.dart';
 import '../screens/lounge/active_lounge_screen.dart';
 import '../screens/purchase/buy_time_checkout_screen.dart';
 import '../screens/purchase/buy_time_screen.dart';
 import '../screens/purchase/checkout_screen.dart';
 import '../screens/purchase/pricing_screen.dart';
+import '../screens/staff/bartender_bar_screen.dart';
 import '../screens/staff/bartender_tip_pad_screen.dart';
 import '../screens/staff/door_scanner_screen.dart';
 import '../screens/summary/summary_screen.dart';
@@ -33,10 +38,12 @@ class AppRouter {
         if (app.isLoading) return null;
 
         final loc = state.matchedLocation;
-        final isPublic = loc == '/' ||
+        final isPublic =
+            loc == '/' ||
             loc == '/login' ||
             loc == '/signup' ||
             loc == '/verify-email' ||
+            loc == '/event-invite' ||
             loc == '/privacy' ||
             loc == '/terms';
 
@@ -55,7 +62,11 @@ class AppRouter {
 
         // Staff: door scanner + tip pad
         if (app.isStaff) {
-          if (loc == '/staff' || loc == '/staff/tip-pad') return null;
+          if (loc == '/staff' ||
+              loc == '/staff/tip-pad' ||
+              loc == '/staff/bar') {
+            return null;
+          }
           return '/staff';
         }
 
@@ -75,14 +86,19 @@ class AppRouter {
         if (loc == '/staff') return routeForMemberState(app);
 
         // Exit receipt wins over every other member redirect.
-        if (app.hasCheckoutReceipt || app.sessionPhase == SessionPhase.completed) {
+        if (app.hasCheckoutReceipt ||
+            app.sessionPhase == SessionPhase.completed) {
           if (loc != '/summary') return '/summary';
           return null;
         }
 
         // Guest Buy Time / in-app checkout temporarily disabled — loads happen at the club desk.
-        if (loc == '/buy-time' || loc == '/buy-time/checkout' || loc == '/checkout') {
-          if (app.sessionPhase == SessionPhase.paidAwaitingEntry) return '/entry';
+        if (loc == '/buy-time' ||
+            loc == '/buy-time/checkout' ||
+            loc == '/checkout') {
+          if (app.sessionPhase == SessionPhase.paidAwaitingEntry) {
+            return '/entry';
+          }
           if (app.sessionPhase == SessionPhase.insideClub) return '/lounge';
           if (app.hasCheckoutReceipt ||
               app.sessionPhase == SessionPhase.completed) {
@@ -94,17 +110,21 @@ class AppRouter {
         final phase = app.sessionPhase;
         if (phase == SessionPhase.paidAwaitingEntry &&
             loc != '/entry' &&
-            loc != '/checkout') {
+            loc != '/checkout' &&
+            loc != '/event-pass') {
           return loc == '/pricing' || loc == '/checkout' ? null : '/entry';
         }
         if (phase == SessionPhase.insideClub &&
             loc != '/exit' &&
+            loc != '/event-pass' &&
             (loc == '/entry' ||
                 loc == '/checkout' ||
                 (loc == '/pricing' && !app.isTimeDepleted))) {
           return '/lounge';
         }
-        if (phase == SessionPhase.awaitingExitScan && loc != '/exit') {
+        if (phase == SessionPhase.awaitingExitScan &&
+            loc != '/exit' &&
+            loc != '/event-pass') {
           return '/exit';
         }
         if (phase == SessionPhase.none && loc == '/lounge') {
@@ -123,6 +143,24 @@ class AppRouter {
             final email = state.uri.queryParameters['email'] ?? '';
             final name = state.uri.queryParameters['name'] ?? '';
             return VerifyEmailScreen(email: email, name: name);
+          },
+        ),
+        GoRoute(
+          path: '/event-invite',
+          builder: (context, state) {
+            final code = state.uri.queryParameters['code'];
+            final token = state.uri.queryParameters['token'];
+            return EventInviteScreen(initialCode: code, initialToken: token);
+          },
+        ),
+        GoRoute(
+          path: '/event-pass',
+          builder: (context, state) {
+            final invite = state.extra;
+            if (invite is! EventInvitePreview) {
+              return const EventHubScreen();
+            }
+            return EventGuestPassScreen(invite: invite);
           },
         ),
         GoRoute(
@@ -153,12 +191,17 @@ class AppRouter {
         ),
         GoRoute(path: '/entry', builder: (_, _) => const EntryGateScreen()),
         GoRoute(path: '/lounge', builder: (_, _) => const ActiveLoungeScreen()),
+        GoRoute(path: '/events', builder: (_, _) => const EventHubScreen()),
         GoRoute(path: '/exit', builder: (_, _) => const ExitGateScreen()),
         GoRoute(path: '/summary', builder: (_, _) => const SummaryScreen()),
         GoRoute(path: '/staff', builder: (_, _) => const DoorScannerScreen()),
         GoRoute(
           path: '/staff/tip-pad',
           builder: (_, _) => const BartenderTipPadScreen(),
+        ),
+        GoRoute(
+          path: '/staff/bar',
+          builder: (_, _) => const BartenderBarScreen(),
         ),
       ],
     );

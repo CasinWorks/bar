@@ -30,9 +30,10 @@ class _FadeSlideInState extends State<FadeSlideIn>
     super.initState();
     _c = AnimationController(vsync: this, duration: widget.duration);
     _opacity = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
-    _slide = Tween(begin: widget.offset, end: Offset.zero).animate(
-      CurvedAnimation(parent: _c, curve: Curves.easeOutCubic),
-    );
+    _slide = Tween(
+      begin: widget.offset,
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
     Future<void>.delayed(widget.delay, () {
       if (mounted) _c.forward();
     });

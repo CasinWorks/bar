@@ -13,11 +13,7 @@ import '../../services/auth_service.dart';
 
 /// Waiting room after signup while Supabase email confirmation is pending.
 class VerifyEmailScreen extends StatefulWidget {
-  const VerifyEmailScreen({
-    super.key,
-    required this.email,
-    this.name = '',
-  });
+  const VerifyEmailScreen({super.key, required this.email, this.name = ''});
 
   final String email;
   final String name;
@@ -92,7 +88,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final displayName = widget.name.trim().isEmpty ? 'Member' : widget.name.trim();
+    final displayName = widget.name.trim().isEmpty
+        ? 'Member'
+        : widget.name.trim();
 
     return Scaffold(
       backgroundColor: AppColors.darkBackground,

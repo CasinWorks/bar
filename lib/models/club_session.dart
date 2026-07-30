@@ -27,6 +27,9 @@ class ClubSessionRecord {
     this.bonusMinutesEarned = 0,
     this.enteredAt,
     this.exitedAt,
+    this.activeVipRoomSlug,
+    this.vipRoomTimeSeconds = 0,
+    this.vipRoomDrinkMinutesSpent = 0,
   });
 
   final String id;
@@ -46,6 +49,16 @@ class ClubSessionRecord {
   int bonusMinutesEarned;
   DateTime? enteredAt;
   DateTime? exitedAt;
+
+  /// Active VIP room/couch booking slug, if any.
+  String? activeVipRoomSlug;
+
+  /// Separate liquor tab — not personal liquid time.
+  int vipRoomTimeSeconds;
+  int vipRoomDrinkMinutesSpent;
+
+  bool get isInVipRoom =>
+      activeVipRoomSlug != null && activeVipRoomSlug!.isNotEmpty;
 
   String get displayCode =>
       id.replaceAll('-', '').substring(0, 8).toUpperCase();
@@ -140,6 +153,9 @@ class ClubSessionRecord {
     'bonus_minutes_earned': bonusMinutesEarned,
     'entered_at': enteredAt?.toUtc().toIso8601String(),
     'exited_at': exitedAt?.toUtc().toIso8601String(),
+    'active_vip_room_slug': activeVipRoomSlug,
+    'vip_room_time_seconds': vipRoomTimeSeconds,
+    'vip_room_drink_minutes_spent': vipRoomDrinkMinutesSpent,
   };
 
   factory ClubSessionRecord.fromSupabaseRow(Map<String, dynamic> json) {
@@ -161,6 +177,10 @@ class ClubSessionRecord {
       bonusMinutesEarned: json['bonus_minutes_earned'] as int? ?? 0,
       enteredAt: _parseTimestamp(json['entered_at']),
       exitedAt: _parseTimestamp(json['exited_at']),
+      activeVipRoomSlug: json['active_vip_room_slug'] as String?,
+      vipRoomTimeSeconds: json['vip_room_time_seconds'] as int? ?? 0,
+      vipRoomDrinkMinutesSpent:
+          json['vip_room_drink_minutes_spent'] as int? ?? 0,
     );
   }
 
@@ -182,6 +202,9 @@ class ClubSessionRecord {
     'bonusMinutesEarned': bonusMinutesEarned,
     'enteredAt': enteredAt?.toUtc().toIso8601String(),
     'exitedAt': exitedAt?.toUtc().toIso8601String(),
+    'activeVipRoomSlug': activeVipRoomSlug,
+    'vipRoomTimeSeconds': vipRoomTimeSeconds,
+    'vipRoomDrinkMinutesSpent': vipRoomDrinkMinutesSpent,
   };
 
   factory ClubSessionRecord.fromJson(Map<String, dynamic> json) {
@@ -203,6 +226,9 @@ class ClubSessionRecord {
       bonusMinutesEarned: json['bonusMinutesEarned'] as int? ?? 0,
       enteredAt: _parseTimestamp(json['enteredAt']),
       exitedAt: _parseTimestamp(json['exitedAt']),
+      activeVipRoomSlug: json['activeVipRoomSlug'] as String?,
+      vipRoomTimeSeconds: json['vipRoomTimeSeconds'] as int? ?? 0,
+      vipRoomDrinkMinutesSpent: json['vipRoomDrinkMinutesSpent'] as int? ?? 0,
     );
   }
 
@@ -260,6 +286,10 @@ class ClubSessionRecord {
     int? bonusMinutesEarned,
     DateTime? enteredAt,
     DateTime? exitedAt,
+    String? activeVipRoomSlug,
+    int? vipRoomTimeSeconds,
+    int? vipRoomDrinkMinutesSpent,
+    bool clearVipRoom = false,
   }) {
     return ClubSessionRecord(
       id: id,
@@ -281,6 +311,12 @@ class ClubSessionRecord {
       bonusMinutesEarned: bonusMinutesEarned ?? this.bonusMinutesEarned,
       enteredAt: enteredAt ?? this.enteredAt,
       exitedAt: exitedAt ?? this.exitedAt,
+      activeVipRoomSlug: clearVipRoom
+          ? null
+          : (activeVipRoomSlug ?? this.activeVipRoomSlug),
+      vipRoomTimeSeconds: vipRoomTimeSeconds ?? this.vipRoomTimeSeconds,
+      vipRoomDrinkMinutesSpent:
+          vipRoomDrinkMinutesSpent ?? this.vipRoomDrinkMinutesSpent,
     );
   }
 }

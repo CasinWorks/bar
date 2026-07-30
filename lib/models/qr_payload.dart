@@ -20,13 +20,13 @@ class QrPayload {
   final String memberName;
 
   String encode() => jsonEncode({
-        'user_id': userId,
-        'session_id': sessionId,
-        'timestamp': timestamp,
-        'signature': signature,
-        'purpose': purpose.name,
-        'member_name': memberName,
-      });
+    'user_id': userId,
+    'session_id': sessionId,
+    'timestamp': timestamp,
+    'signature': signature,
+    'purpose': purpose.name,
+    'member_name': memberName,
+  });
 
   static QrPayload? decode(String raw) {
     try {
@@ -36,9 +36,7 @@ class QrPayload {
         sessionId: map['session_id'] as String,
         timestamp: map['timestamp'] as int,
         signature: map['signature'] as String,
-        purpose: QrPurpose.values.byName(
-          map['purpose'] as String? ?? 'entry',
-        ),
+        purpose: QrPurpose.values.byName(map['purpose'] as String? ?? 'entry'),
         memberName: map['member_name'] as String? ?? 'Guest',
       );
     } catch (_) {

@@ -34,7 +34,11 @@ class AvatarConfig {
 }
 
 class AvatarOption {
-  const AvatarOption({required this.id, required this.name, required this.path});
+  const AvatarOption({
+    required this.id,
+    required this.name,
+    required this.path,
+  });
   final String id;
   final String name;
   final String path;
@@ -119,6 +123,7 @@ class Challenge {
   final int targetCount;
   int currentCount;
   final int points;
+
   /// Minutes credited to wallet on claim (Club District earn model).
   final int bonusMinutes;
   bool claimed;
@@ -126,10 +131,7 @@ class Challenge {
 
   bool get isComplete => currentCount >= targetCount;
 
-  Challenge copyWith({
-    int? currentCount,
-    bool? claimed,
-  }) {
+  Challenge copyWith({int? currentCount, bool? claimed}) {
     return Challenge(
       id: id,
       title: title,
@@ -204,20 +206,20 @@ abstract final class MemberTierThresholds {
 
 extension MemberTierLabel on MemberTier {
   String get label => switch (this) {
-        MemberTier.vvip => 'VVIP',
-        MemberTier.platinum => 'Platinum',
-        MemberTier.gold => 'Gold',
-        MemberTier.silver => 'Silver',
-        MemberTier.bronze => 'Bronze',
-      };
+    MemberTier.vvip => 'VVIP',
+    MemberTier.platinum => 'Platinum',
+    MemberTier.gold => 'Gold',
+    MemberTier.silver => 'Silver',
+    MemberTier.bronze => 'Bronze',
+  };
 
   Color get accentColor => switch (this) {
-        MemberTier.vvip => AppColors.vvipAmethyst,
-        MemberTier.platinum => AppColors.goldBright,
-        MemberTier.gold => AppColors.tigerOrange,
-        MemberTier.silver => AppColors.neutral400,
-        MemberTier.bronze => AppColors.goldDark,
-      };
+    MemberTier.vvip => AppColors.vvipAmethyst,
+    MemberTier.platinum => AppColors.goldBright,
+    MemberTier.gold => AppColors.tigerOrange,
+    MemberTier.silver => AppColors.neutral400,
+    MemberTier.bronze => AppColors.goldDark,
+  };
 }
 
 class LeaderboardUser {
@@ -246,11 +248,11 @@ enum DrinkCategory { spirits, wine, beer, nonAlc }
 
 extension DrinkCategoryLabel on DrinkCategory {
   String get label => switch (this) {
-        DrinkCategory.spirits => 'Spirits',
-        DrinkCategory.wine => 'Wine',
-        DrinkCategory.beer => 'Beer',
-        DrinkCategory.nonAlc => 'Non-Alc',
-      };
+    DrinkCategory.spirits => 'Spirits',
+    DrinkCategory.wine => 'Wine',
+    DrinkCategory.beer => 'Beer',
+    DrinkCategory.nonAlc => 'Non-Alc',
+  };
 }
 
 enum DrinkKind { standard, premium }
@@ -285,6 +287,7 @@ class Drink {
   final String bartenderQuote;
   final int imageColorStart;
   final int imageColorEnd;
+
   /// Premium path: burn minutes. Standard path: uses package allowance.
   final int timeCostSeconds;
   final DrinkKind kind;
@@ -318,8 +321,8 @@ class ClubBranch {
     required this.id,
     required this.name,
     required this.city,
-    required this.icon,
-    required this.ambience,
+    this.icon = '',
+    this.ambience = '',
   });
 
   final String id;
@@ -327,18 +330,34 @@ class ClubBranch {
   final String city;
   final String icon;
   final String ambience;
+
+  factory ClubBranch.fromSupabaseRow(Map<String, dynamic> json) {
+    final slug = (json['slug'] as String?)?.trim();
+    final rawId = json['id'];
+    return ClubBranch(
+      id: slug?.isNotEmpty == true
+          ? slug!
+          : (rawId is String && rawId.trim().isNotEmpty
+                ? rawId.trim()
+                : (json['name'] as String? ?? '').trim()),
+      name: (json['name'] as String? ?? '').trim(),
+      city: (json['city'] as String? ?? '').trim(),
+      icon: (json['icon'] as String? ?? '').trim(),
+      ambience: (json['ambience'] as String? ?? '').trim(),
+    );
+  }
 }
 
 enum PaymentMethod { gcash, visa, paymaya }
 
 extension PaymentMethodLabel on PaymentMethod {
   String get label => switch (this) {
-        PaymentMethod.gcash => 'GCASH',
-        PaymentMethod.visa => 'VISA',
-        PaymentMethod.paymaya => 'MAYA',
-      };
+    PaymentMethod.gcash => 'GCASH',
+    PaymentMethod.visa => 'VISA',
+    PaymentMethod.paymaya => 'MAYA',
+  };
 }
 
-enum LoungeTab { challenges, games, social, menu, leaderboard }
+enum LoungeTab { timeEconomy, games, social, chats, menu, leaderboard }
 
 enum DoorStatus { locked, unlocked, wrong }

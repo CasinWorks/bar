@@ -29,7 +29,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('You still have time on your account. Use your balance, or ask the house to load more.'),
+          content: Text(
+            'You still have time on your account. Use your balance, or ask the house to load more.',
+          ),
         ),
       );
       context.go('/pricing');
@@ -92,7 +94,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 4),
               Text(
                 'PROVISIONING SMART ID #7 • THE BLIND TIGER',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 10),
               ),
             ],
           ),

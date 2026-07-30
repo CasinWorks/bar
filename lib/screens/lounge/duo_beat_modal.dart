@@ -58,7 +58,9 @@ class _DuoBeatModalState extends State<DuoBeatModal> {
       _busy = true;
       _error = null;
     });
-    final (meet, err) = await context.read<AppState>().submitDuoBeatScore(score);
+    final (meet, err) = await context.read<AppState>().submitDuoBeatScore(
+      score,
+    );
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -71,9 +73,8 @@ class _DuoBeatModalState extends State<DuoBeatModal> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final meet = _result ?? state.activeMeet;
-    final waitingOpponent = _submitted &&
-        meet != null &&
-        meet.status != MeetStatus.completed;
+    final waitingOpponent =
+        _submitted && meet != null && meet.status != MeetStatus.completed;
 
     String? outcome;
     if (meet?.status == MeetStatus.completed && state.user != null) {
@@ -94,12 +95,17 @@ class _DuoBeatModalState extends State<DuoBeatModal> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('DUO BEAT SYNC', style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              'DUO BEAT SYNC',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 8),
             Text(
               'Tap $_targetTaps times as fast as you can.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11),
             ),
             const SizedBox(height: 20),
             Text(
@@ -116,7 +122,10 @@ class _DuoBeatModalState extends State<DuoBeatModal> {
               const SizedBox(height: 8),
               Text(
                 'Your time: ${(_myMs! / 1000).toStringAsFixed(2)}s',
-                style: const TextStyle(color: AppColors.goldBright, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.goldBright,
+                  fontSize: 12,
+                ),
               ),
             ],
             if (waitingOpponent) ...[
@@ -142,12 +151,21 @@ class _DuoBeatModalState extends State<DuoBeatModal> {
                 Text(
                   'You ${meet.hostId == state.user?.id ? meet.hostScore : meet.guestScore}'
                   ' · Them ${meet.hostId == state.user?.id ? meet.guestScore : meet.hostScore}',
-                  style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textMuted,
+                  ),
                 ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: AppColors.tigerOrange, fontSize: 11)),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: AppColors.tigerOrange,
+                  fontSize: 11,
+                ),
+              ),
             ],
             const SizedBox(height: 16),
             if (!_submitted)

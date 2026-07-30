@@ -3,26 +3,56 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/animated_time_display.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../core/widgets/tiger_motion.dart';
 import '../../models/blind_tiger_models.dart';
+import '../../models/event_models.dart';
 import '../../providers/app_state.dart';
-import 'lounge_tabs.dart';
+import 'time_economy_tab.dart';
+import 'time_wallet_display.dart';
+import 'drink_order_tracker.dart';
+import 'hosted_event_wallet_sheet.dart';
 import 'night_hub_sheet.dart';
 import 'pass_the_glass_sheet.dart';
 import 'tip_bartender_sheet.dart';
 import 'time_depleted_overlay.dart';
 import 'vip_rooms_sheet.dart';
+import 'lounge_tabs.dart';
+import '../auth/member_profile_sheet.dart';
 
-class ActiveLoungeScreen extends StatelessWidget {
+class ActiveLoungeScreen extends StatefulWidget {
   const ActiveLoungeScreen({super.key});
+
+  @override
+  State<ActiveLoungeScreen> createState() => _ActiveLoungeScreenState();
+}
+
+class _ActiveLoungeScreenState extends State<ActiveLoungeScreen> {
+  bool _showingHostedWalletPrompt = false;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final remaining = state.remaining;
     final timerColor = AppColors.timerColor(remaining, isCheckedIn: true);
+
+    if (state.shouldPromptHostedEventWallet && !_showingHostedWalletPrompt) {
+      _showingHostedWalletPrompt = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await HostedEventWalletSheet.show(context, promptOnOpen: true);
+        if (mounted) {
+          setState(() => _showingHostedWalletPrompt = false);
+        }
+      });
+    } else if (!state.shouldPromptHostedEventWallet &&
+        _showingHostedWalletPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _showingHostedWalletPrompt = false);
+      });
+    }
 
     return Scaffold(
       body: LatticeBackground(
@@ -105,6 +135,8 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
+          const AppLogo(size: 28),
+          const SizedBox(width: 8),
           CircleAvatar(
             radius: 18,
             backgroundColor: Color(state.avatar.color),
@@ -118,18 +150,34 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(state.user?.name ?? 'Member', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  state.user?.name ?? 'Member',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 Text(
                   '${state.session?.branch ?? ''} • #${state.currentRank} ${state.memberTier.label}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                 ),
               ],
             ),
           ),
           IconButton(
+            tooltip: 'Profile',
+            onPressed: () => MemberProfileSheet.show(context),
+            icon: const Icon(
+              Icons.person_outline_rounded,
+              color: AppColors.offWhite,
+            ),
+          ),
+          IconButton(
             tooltip: 'Your night',
             onPressed: () => NightHubSheet.show(context),
-            icon: const Icon(Icons.grid_view_rounded, color: AppColors.goldBright),
+            icon: const Icon(
+              Icons.grid_view_rounded,
+              color: AppColors.goldBright,
+            ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -140,7 +188,12 @@ class _Header extends StatelessWidget {
             ),
             child: const Text(
               'INSIDE CLUB',
-              style: TextStyle(color: AppColors.successGreen, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1),
+              style: TextStyle(
+                color: AppColors.successGreen,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
             ),
           ),
         ],
@@ -213,23 +266,37 @@ class _TimerCardState extends State<_TimerCard> {
   @override
   Widget build(BuildContext context) {
     final roomState = context.watch<AppState>();
+    final hostedWallet = roomState.hostedEventWalletSummary;
     final expanded = _isExpanded(context);
     final timerLabel = widget.isDepleted
         ? 'TIME DEPLETED'
         : AppColors.timerLabel(Duration(seconds: widget.timeRemaining));
-    final labelColor =
-        widget.isDepleted ? AppColors.tigerOrange : widget.timerColor;
+    final labelColor = widget.isDepleted
+        ? AppColors.tigerOrange
+        : widget.timerColor;
     final expandedFontSize = widget.timeRemaining >= 3600 ? 40.0 : 48.0;
     final collapsedFontSize = widget.timeRemaining >= 3600 ? 26.0 : 30.0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: EdgeInsets.fromLTRB(16, expanded ? 16 : 12, 16, expanded ? 16 : 12),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        expanded ? 16 : 12,
+        16,
+        expanded ? 16 : 12,
+      ),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF1C0F00), Color(0xFF050000)]),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1C0F00), Color(0xFF050000)],
+        ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: widget.timerColor.withValues(alpha: 0.5)),
-        boxShadow: [BoxShadow(color: widget.timerColor.withValues(alpha: 0.2), blurRadius: 20)],
+        boxShadow: [
+          BoxShadow(
+            color: widget.timerColor.withValues(alpha: 0.2),
+            blurRadius: 20,
+          ),
+        ],
       ),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 280),
@@ -279,8 +346,23 @@ class _TimerCardState extends State<_TimerCard> {
                       AnimatedTimeDisplay(
                         seconds: widget.timeRemaining,
                         color: widget.timerColor,
-                        fontSize: expanded ? expandedFontSize : collapsedFontSize,
+                        fontSize: expanded
+                            ? expandedFontSize
+                            : collapsedFontSize,
                       ),
+                      if (expanded)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: TimeEconomyStatsBar(compact: true),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: TimeWalletDisplay(
+                            snapshot: roomState.timeWallet,
+                            compact: true,
+                          ),
+                        ),
                       if (expanded)
                         Text(
                           timerLabel,
@@ -292,7 +374,7 @@ class _TimerCardState extends State<_TimerCard> {
                         )
                       else
                         Text(
-                          '$timerLabel · ${roomState.drinksAllowanceRemaining} drinks · ${widget.points} PTS',
+                          '$timerLabel · ${roomState.drinksAllowanceAvailable} drinks · ${widget.points} PTS',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: labelColor.withValues(alpha: 0.9),
@@ -307,9 +389,28 @@ class _TimerCardState extends State<_TimerCard> {
             ),
             if (expanded) ...[
               const SizedBox(height: 10),
+              if (roomState.isInVipRoom) ...[
+                Text(
+                  '${roomState.activeVipRoomName} · ${roomState.formatDuration(roomState.vipRoomTimeSeconds)} room tab',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 11,
+                    color: const Color(0xFF9B59B6),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+              if (hostedWallet != null) ...[
+                _HostedEventWalletBanner(summary: hostedWallet),
+                const SizedBox(height: 10),
+              ],
+              const DrinkOrderTracker(),
+              const SizedBox(height: 6),
               Text(
-                '${roomState.drinksAllowanceRemaining} drinks left · package wallet',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                '${roomState.drinksAllowanceAvailable} drinks left · package wallet',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 11),
               ),
               const SizedBox(height: 10),
               TigerButton(
@@ -317,6 +418,20 @@ class _TimerCardState extends State<_TimerCard> {
                 icon: Icons.grid_view_rounded,
                 onPressed: () => NightHubSheet.show(context),
               ),
+              if (hostedWallet != null) ...[
+                const SizedBox(height: 8),
+                TigerButton(
+                  label: hostedWallet.isLow
+                      ? 'EXTEND EVENT WALLET'
+                      : 'EVENT WALLET',
+                  icon: Icons.account_balance_wallet,
+                  secondary: true,
+                  onPressed: () => HostedEventWalletSheet.show(
+                    context,
+                    promptOnOpen: hostedWallet.isLow,
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               TigerButton(
                 label: 'TIP BAR',
@@ -329,13 +444,13 @@ class _TimerCardState extends State<_TimerCard> {
                 label: roomState.hasVvipRoomAccess
                     ? 'VVIP ROOM'
                     : roomState.hasVipRoomAccess
-                        ? 'VIP ROOM'
-                        : 'PRIVATE ROOMS',
+                    ? 'VIP ROOM'
+                    : 'PRIVATE ROOMS',
                 icon: roomState.hasVvipRoomAccess
                     ? Icons.auto_awesome
                     : roomState.hasVipRoomAccess
-                        ? Icons.diamond
-                        : Icons.meeting_room,
+                    ? Icons.diamond
+                    : Icons.meeting_room,
                 secondary: true,
                 onPressed: () => VipRoomsSheet.show(context),
               ),
@@ -354,6 +469,63 @@ class _TimerCardState extends State<_TimerCard> {
   }
 }
 
+class _HostedEventWalletBanner extends StatelessWidget {
+  const _HostedEventWalletBanner({required this.summary});
+
+  final HostedEventWalletSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final accent = summary.isDepleted
+        ? AppColors.dangerRed
+        : summary.isLow
+        ? AppColors.goldBright
+        : AppColors.successGreen;
+
+    return LuxuryCard(
+      highlighted: summary.isLow,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Icon(Icons.account_balance_wallet, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'HOST EVENT WALLET',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    color: accent,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                Text(
+                  '${summary.event.title} · ${state.formatDuration(summary.remainingSeconds)} remaining',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                ),
+                Text(
+                  summary.isLow
+                      ? 'Spent ${state.formatDuration(summary.consumedSeconds)} · extended ${state.formatDuration(summary.extendedSeconds)} · extend soon'
+                      : 'Spent ${state.formatDuration(summary.consumedSeconds)} · extended ${state.formatDuration(summary.extendedSeconds)}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 9),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TabBody extends StatelessWidget {
   const _TabBody({required this.tab});
   final LoungeTab tab;
@@ -363,9 +535,10 @@ class _TabBody extends StatelessWidget {
     return IndexedStack(
       index: tab.index,
       children: const [
-        ChallengesTab(),
+        TimeEconomyTab(),
         GamesTab(),
         SocialTab(),
+        ChatsTab(),
         MenuTab(),
         LeaderboardTab(),
       ],
@@ -380,9 +553,10 @@ class _TabBar extends StatelessWidget {
   final ValueChanged<LoungeTab> onChanged;
 
   static const _items = [
-    (LoungeTab.challenges, Icons.emoji_events, 'EARN'),
+    (LoungeTab.timeEconomy, Icons.bolt, 'TIME'),
     (LoungeTab.games, Icons.grid_view, 'PLAY'),
     (LoungeTab.social, Icons.people, 'FEED'),
+    (LoungeTab.chats, Icons.chat_bubble_outline, 'CHATS'),
     (LoungeTab.menu, Icons.auto_awesome, 'MENU'),
     (LoungeTab.leaderboard, Icons.leaderboard, 'RANK'),
   ];
@@ -392,7 +566,9 @@ class _TabBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.goldBrushed.withValues(alpha: 0.2))),
+        border: Border(
+          top: BorderSide(color: AppColors.goldBrushed.withValues(alpha: 0.2)),
+        ),
       ),
       child: Row(
         children: _items.map((item) {
@@ -408,7 +584,13 @@ class _TabBar extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(item.$2, size: 18, color: isActive ? AppColors.goldBright : AppColors.neutral500),
+                      Icon(
+                        item.$2,
+                        size: 18,
+                        color: isActive
+                            ? AppColors.goldBright
+                            : AppColors.neutral500,
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         item.$3,
@@ -416,7 +598,9 @@ class _TabBar extends StatelessWidget {
                           fontSize: 7,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0.5,
-                          color: isActive ? AppColors.goldBright : AppColors.neutral500,
+                          color: isActive
+                              ? AppColors.goldBright
+                              : AppColors.neutral500,
                         ),
                       ),
                     ],

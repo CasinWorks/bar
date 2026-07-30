@@ -187,9 +187,27 @@ class SupabaseSessionStore extends SessionStoreDelegate {
 
   @override
   Future<void> upsert(ClubSessionRecord session) async {
-    await _client.from('club_sessions').upsert(session.toSupabaseRow());
+    final row = session.toSupabaseRow();
+    try {
+      await _client.from('club_sessions').upsert(row);
+    } catch (error) {
+      // Pre-027 schema: VIP columns are absent. Retry without them so
+      // visit creation / door entry is not blocked by an unapplied migration.
+      if (!_isMissingVipRoomColumnError(error)) rethrow;
+      row.remove('active_vip_room_slug');
+      row.remove('vip_room_time_seconds');
+      row.remove('vip_room_drink_minutes_spent');
+      await _client.from('club_sessions').upsert(row);
+    }
     _cache[session.id] = session;
     notifyListeners();
+  }
+
+  static bool _isMissingVipRoomColumnError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('active_vip_room_slug') ||
+        message.contains('vip_room_time_seconds') ||
+        message.contains('vip_room_drink_minutes_spent');
   }
 
   @override

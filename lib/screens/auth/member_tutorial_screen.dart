@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../providers/app_state.dart';
 import '../../router/member_routes.dart';
@@ -110,6 +111,8 @@ class _MemberTutorialScreenState extends State<MemberTutorialScreen>
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: Row(
                   children: [
+                    const AppLogo(size: 26),
+                    const SizedBox(width: 10),
                     Text(
                       'MEMBER BRIEFING',
                       style: GoogleFonts.inter(
@@ -254,7 +257,9 @@ class _MemberTutorialScreenState extends State<MemberTutorialScreen>
                     const SizedBox(height: 16),
                     TigerButton(
                       label: onLast ? 'ENTER THE CLUB' : 'NEXT',
-                      icon: onLast ? Icons.door_front_door_rounded : Icons.arrow_forward_rounded,
+                      icon: onLast
+                          ? Icons.door_front_door_rounded
+                          : Icons.arrow_forward_rounded,
                       onPressed: _next,
                     ),
                   ],

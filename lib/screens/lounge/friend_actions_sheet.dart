@@ -140,8 +140,8 @@ class _FriendActionsSheetState extends State<FriendActionsSheet> {
                           _checking
                               ? 'Checking friendship…'
                               : friends
-                                  ? (profile.vibeTag ?? 'Friend')
-                                  : 'Not friends yet — add to ping or chat',
+                              ? (profile.vibeTag ?? 'Friend')
+                              : 'Not friends yet — add to ping or chat',
                           style: const TextStyle(
                             color: AppColors.textMuted,
                             fontSize: 11,
@@ -160,7 +160,9 @@ class _FriendActionsSheetState extends State<FriendActionsSheet> {
               if (_checking)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 )
               else if (friends) ...[
                 Wrap(
@@ -193,7 +195,9 @@ class _FriendActionsSheetState extends State<FriendActionsSheet> {
                   onPressed: () {
                     final profile = this.profile;
                     final overlay = Navigator.of(context).overlay?.context;
+                    final app = context.read<AppState>();
                     Navigator.pop(context);
+                    app.openChatsTab();
                     if (overlay != null) {
                       FriendChatSheet.show(overlay, profile);
                     }

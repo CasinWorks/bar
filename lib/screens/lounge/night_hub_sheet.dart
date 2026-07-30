@@ -30,7 +30,8 @@ class NightHubSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final drinks = state.drinksAllowanceRemaining;
+    final drinks = state.drinksAllowanceAvailable;
+    final hostedWallet = state.hostedEventWalletSummary;
     final pkg = ClubPackages.bySlug(
       state.session?.packageSlug ?? state.user?.activePackageSlug,
     );
@@ -56,23 +57,29 @@ class NightHubSheet extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'YOUR NIGHT',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontSize: 18),
             ),
             Text(
               pkg != null
-                  ? '${pkg.name} · ${state.formatDuration(state.timeBalance)} · $drinks drinks left'
-                  : '${state.formatDuration(state.timeBalance)} · $drinks drinks left',
+                  ? '${pkg.name} · ${state.formatDuration(state.timeBalance)} liquid · ${state.timeWallet.bankedMinutes}m banked'
+                  : '${state.formatDuration(state.timeBalance)} liquid · ${state.timeWallet.bankedMinutes}m banked · $drinks drinks',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
             Expanded(
               child: ListView(
                 children: [
-                  Text('REVENUE & ACCESS', style: Theme.of(context).textTheme.labelLarge),
+                  Text(
+                    'REVENUE & ACCESS',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
                   const SizedBox(height: 8),
                   _HubTile(
                     title: 'Time packages / extend',
-                    subtitle: 'Buy more minutes at the desk — wallet updates live',
+                    subtitle:
+                        'Buy more minutes at the desk — wallet updates live',
                     icon: Icons.schedule,
                     onTap: () {
                       Navigator.pop(context);
@@ -99,19 +106,22 @@ class NightHubSheet extends StatelessWidget {
                   ),
                   _HubTile(
                     title: 'Events',
-                    subtitle: 'Themed nights — ask the house what’s on',
+                    subtitle: hostedWallet != null
+                        ? hostedWallet.isLow
+                              ? '${hostedWallet.event.title} · ${state.formatDuration(hostedWallet.remainingSeconds)} left · extend soon'
+                              : '${hostedWallet.event.title} · ${state.formatDuration(hostedWallet.remainingSeconds)} event wallet'
+                        : 'Request a hosted event or track your approvals',
                     icon: Icons.event,
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Ask the house about tonight’s events.'),
-                        ),
-                      );
+                      context.go('/events');
                     },
                   ),
                   const SizedBox(height: 16),
-                  Text('SOFTWARE MODULES', style: Theme.of(context).textTheme.labelLarge),
+                  Text(
+                    'SOFTWARE MODULES',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
                   const SizedBox(height: 8),
                   _HubTile(
                     title: 'QR entry / exit',
@@ -143,12 +153,30 @@ class NightHubSheet extends StatelessWidget {
                     },
                   ),
                   _HubTile(
-                    title: 'Loyalty / earn time',
-                    subtitle: 'Challenges award bonus minutes',
+                    title: 'Time Economy & Quests',
+                    subtitle: 'Liquid · Banked · Reserved time + live quests',
+                    icon: Icons.bolt,
+                    onTap: () {
+                      Navigator.pop(context);
+                      state.setActiveTab(LoungeTab.timeEconomy);
+                    },
+                  ),
+                  _HubTile(
+                    title: 'Competitive rankings',
+                    subtitle: 'Social · Dancer · Quests · Introductions',
                     icon: Icons.emoji_events,
                     onTap: () {
                       Navigator.pop(context);
-                      state.setActiveTab(LoungeTab.challenges);
+                      state.setActiveTab(LoungeTab.leaderboard);
+                    },
+                  ),
+                  _HubTile(
+                    title: 'Loyalty / earn time',
+                    subtitle: 'Quests award liquid & banked minutes',
+                    icon: Icons.emoji_events,
+                    onTap: () {
+                      Navigator.pop(context);
+                      state.setActiveTab(LoungeTab.timeEconomy);
                     },
                   ),
                   _HubTile(
@@ -213,8 +241,14 @@ class _HubTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: Theme.of(context).textTheme.titleMedium),
-                      Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                 ),

@@ -1,7 +1,7 @@
 name: in_time_bartender
 description: "In Time Bartender — premium time-based bar experience."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+27
 
 environment:
   sdk: ^3.12.1
@@ -26,11 +26,23 @@ dependencies:
   flutter_local_notifications: ^22.1.0
   firebase_core: ^4.12.1
   firebase_messaging: ^16.4.3
+  add_2_calendar: ^3.1.1
+  app_links: ^7.2.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/logo.png
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  adaptive_icon_background: "#0E0E0E"
+  adaptive_icon_foreground: assets/images/logo.png
 
 flutter:
   uses-material-design: true

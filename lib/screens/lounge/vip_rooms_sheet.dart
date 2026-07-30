@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../models/club_packages.dart';
+import '../../models/vip_hosted_event_conflict.dart';
 import '../../providers/app_state.dart';
 
-/// Spend time on venue experiences — time is the currency.
+/// Book VIP rooms/couches (room tab) or spend personal time on other experiences.
 class VipRoomsSheet extends StatefulWidget {
   const VipRoomsSheet({super.key});
 
@@ -37,6 +38,15 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
       setState(() => _error = 'Hang on — another spend is still processing.');
       return;
     }
+    if (activity.isVipRoomExperience && state.blocksVipRoomDueToHostedEvent) {
+      setState(() => _error = VipHostedEventConflict.bookingBlockedMessage);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(VipHostedEventConflict.bookingBlockedMessage),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _spendingSlug = activity.slug;
@@ -50,8 +60,19 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
 
     if (!ok) {
       setState(() {
-        _error = 'Could not unlock ${activity.name}. Check your time balance.';
+        _error = activity.isVipRoomExperience
+            ? (state.blocksVipRoomDueToHostedEvent
+                  ? VipHostedEventConflict.bookingBlockedMessage
+                  : 'Could not book ${activity.name}. Try again.')
+            : 'Could not unlock ${activity.name}. Check your personal time.';
       });
+      if (activity.isVipRoomExperience && state.blocksVipRoomDueToHostedEvent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(VipHostedEventConflict.bookingBlockedMessage),
+          ),
+        );
+      }
       return;
     }
 
@@ -59,7 +80,9 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '${activity.name} unlocked (−${activity.timeCostMinutes} min). Invest your time wisely.',
+          activity.isVipRoomExperience
+              ? '${activity.name} booked · ${activity.timeCostMinutes} min room time (personal timer paused while room is active).'
+              : '${activity.name} unlocked (−${activity.timeCostMinutes} min personal time).',
         ),
       ),
     );
@@ -90,18 +113,64 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              'SPEND TIME',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18),
+              state.isInVipRoom ? 'VIP ROOM ACTIVE' : 'SPEND TIME',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontSize: 18),
             ),
-            Text(
-              'Premium experiences use minutes — ${state.formatDuration(state.timeBalance)} remaining.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
-            ),
+            if (state.isInVipRoom) ...[
+              Text(
+                '${state.activeVipRoomName} · ${state.formatDuration(state.vipRoomTimeSeconds)} room time · decays instead of personal · liquor also charges this pool.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Personal time: ${state.formatDuration(state.timeBalance)} (paused while room time remains)',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 10,
+                  color: AppColors.timerHealthy,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TigerButton(
+                label: 'LEAVE VIP ROOM',
+                secondary: true,
+                onPressed: busy
+                    ? null
+                    : () async {
+                        await state.leaveVipRoom();
+                        if (context.mounted) Navigator.pop(context);
+                      },
+              ),
+              const SizedBox(height: 12),
+            ] else ...[
+              Text(
+                'Personal time: ${state.formatDuration(state.timeBalance)} · VIP room time decays while you occupy the room.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              ),
+            ],
+            if (state.blocksVipRoomDueToHostedEvent) ...[
+              const SizedBox(height: 8),
+              Text(
+                VipHostedEventConflict.bookingBlockedMessage,
+                style: const TextStyle(
+                  color: AppColors.tigerOrange,
+                  fontSize: 12,
+                ),
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(color: AppColors.tigerOrange, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.tigerOrange,
+                  fontSize: 12,
+                ),
               ),
             ],
             const SizedBox(height: 16),
@@ -131,26 +200,37 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
                         ),
                         Text(
                           'OPEN',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: AppColors.timerHealthy,
-                              ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(color: AppColors.timerHealthy),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 10),
                   ...VenueActivities.all.map((activity) {
+                    final isVip = activity.isVipRoomExperience;
                     final costSec = activity.timeCostMinutes * 60;
-                    final canAfford = state.timeBalance >= costSec;
+                    final hostBlocksVip =
+                        isVip && state.blocksVipRoomDueToHostedEvent;
+                    final canAfford = isVip
+                        ? !state.isInVipRoom && !hostBlocksVip
+                        : state.timeBalance >= costSec;
                     final thisBusy = _spendingSlug == activity.slug;
+                    final isActiveRoom =
+                        state.isInVipRoom &&
+                        state.session?.activeVipRoomSlug == activity.slug;
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: LuxuryCard(
-                        highlighted: canAfford && !busy,
+                        highlighted: (canAfford || isActiveRoom) && !busy,
                         padding: const EdgeInsets.all(14),
                         child: Row(
                           children: [
-                            Text(activity.icon, style: const TextStyle(fontSize: 22)),
+                            Text(
+                              activity.icon,
+                              style: const TextStyle(fontSize: 22),
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -158,23 +238,44 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
                                 children: [
                                   Text(
                                     activity.name.toUpperCase(),
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
                                   ),
                                   Text(
                                     activity.description,
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
                                   ),
+                                  if (isVip) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Room time decays while occupied; liquor orders also charge this pool — personal timer pauses.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontSize: 9,
+                                            color: const Color(0xFF9B59B6),
+                                          ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
                             Column(
                               children: [
                                 Text(
-                                  '−${activity.timeCostMinutes}m',
+                                  isVip
+                                      ? '+${activity.timeCostMinutes}m tab'
+                                      : '−${activity.timeCostMinutes}m',
                                   style: TextStyle(
-                                    color: canAfford
-                                        ? AppColors.tigerRed
-                                        : AppColors.textMuted,
+                                    color: isVip
+                                        ? const Color(0xFF9B59B6)
+                                        : (canAfford
+                                              ? AppColors.tigerRed
+                                              : AppColors.textMuted),
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -182,14 +283,21 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
                                 SizedBox(
                                   height: 32,
                                   child: ElevatedButton(
-                                    onPressed: canAfford && !busy
-                                        ? () => _spend(activity)
-                                        : null,
+                                    onPressed: isActiveRoom
+                                        ? null
+                                        : (canAfford && !busy
+                                              ? () => _spend(activity)
+                                              : null),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.tigerRed,
+                                      backgroundColor: isVip
+                                          ? const Color(0xFF9B59B6)
+                                          : AppColors.tigerRed,
                                       foregroundColor: AppColors.offWhite,
-                                      disabledBackgroundColor: AppColors.darkSteel,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      disabledBackgroundColor:
+                                          AppColors.darkSteel,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                      ),
                                     ),
                                     child: thisBusy
                                         ? const SizedBox(
@@ -200,7 +308,14 @@ class _VipRoomsSheetState extends State<VipRoomsSheet> {
                                               color: AppColors.offWhite,
                                             ),
                                           )
-                                        : const Text('SPEND', style: TextStyle(fontSize: 11)),
+                                        : Text(
+                                            isActiveRoom
+                                                ? 'ACTIVE'
+                                                : (isVip ? 'BOOK' : 'SPEND'),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
+                                          ),
                                   ),
                                 ),
                               ],

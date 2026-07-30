@@ -36,13 +36,17 @@ class _BartenderTipPadScreenState extends State<BartenderTipPadScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _pulseScale = Tween(begin: 0.96, end: 1.04).animate(
-      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-    );
+    _pulseScale = Tween(
+      begin: 0.96,
+      end: 1.04,
+    ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
     _qrData = '{}';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshPad();
-      _refresh = Timer.periodic(const Duration(seconds: 45), (_) => _refreshPad());
+      _refresh = Timer.periodic(
+        const Duration(seconds: 45),
+        (_) => _refreshPad(),
+      );
       _appState = context.read<AppState>();
       _appState!.startStaffTipWatch(_onTipReceived);
     });
@@ -119,14 +123,16 @@ class _BartenderTipPadScreenState extends State<BartenderTipPadScreen>
                     Text(
                       'HOLD NEAR GUEST PHONE',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            letterSpacing: 2,
-                            color: AppColors.goldBright,
-                          ),
+                        letterSpacing: 2,
+                        color: AppColors.goldBright,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Works like NFC — guest opens Tip Bar and scans this pad.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(fontSize: 11),
                       textAlign: TextAlign.center,
                     ),
                     const Spacer(),
@@ -137,10 +143,15 @@ class _BartenderTipPadScreenState extends State<BartenderTipPadScreen>
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppColors.goldBrushed, width: 4),
+                          border: Border.all(
+                            color: AppColors.goldBrushed,
+                            width: 4,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.goldBright.withValues(alpha: 0.35),
+                              color: AppColors.goldBright.withValues(
+                                alpha: 0.35,
+                              ),
                               blurRadius: 40,
                             ),
                           ],
@@ -182,7 +193,10 @@ class _BartenderTipPadScreenState extends State<BartenderTipPadScreen>
                       padding: const EdgeInsets.all(14),
                       child: Row(
                         children: [
-                          const Icon(Icons.account_balance_wallet, color: AppColors.timerNeon),
+                          const Icon(
+                            Icons.account_balance_wallet,
+                            color: AppColors.timerNeon,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -190,7 +204,9 @@ class _BartenderTipPadScreenState extends State<BartenderTipPadScreen>
                               children: [
                                 Text(
                                   'TIPS RECEIVED',
-                                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelLarge?.copyWith(fontSize: 9),
                                 ),
                                 AnimatedTimeDisplay(
                                   seconds: state.timeBalance,

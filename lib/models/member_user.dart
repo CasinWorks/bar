@@ -1,3 +1,5 @@
+import '../core/config/super_admin.dart';
+
 enum UserRole { member, staff, admin, hr }
 
 class MemberUser {
@@ -33,12 +35,17 @@ class MemberUser {
   bool get isAdmin => role == UserRole.admin || role == UserRole.hr;
   bool get isMember => role == UserRole.member;
 
+  /// Founder accounts keep an `admin` role for the web console but are allowed
+  /// onto the mobile app (see AuthService._validateMobileAccess), so guest-side
+  /// features must treat them as members instead of silently doing nothing.
+  bool get usesMemberSurface => isMember || isSuperAdminEmail(email);
+
   static UserRole parseRole(String? raw) => switch (raw) {
-        'staff' => UserRole.staff,
-        'admin' => UserRole.admin,
-        'hr' => UserRole.hr,
-        _ => UserRole.member,
-      };
+    'staff' => UserRole.staff,
+    'admin' => UserRole.admin,
+    'hr' => UserRole.hr,
+    _ => UserRole.member,
+  };
 
   bool get isOfAge {
     if (birthdate == null) return isStaff;
@@ -52,36 +59,36 @@ class MemberUser {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'email': email,
-        'birthdate': birthdate?.toIso8601String(),
-        'role': role.name,
-        'branch': branch,
-        'timeBalanceSeconds': timeBalanceSeconds,
-        'isBanned': isBanned,
-        'isWhitelisted': isWhitelisted,
-        'activePackageSlug': activePackageSlug,
-        'includedDrinksRemaining': includedDrinksRemaining,
-        'includedDrinksTotal': includedDrinksTotal,
-      };
+    'id': id,
+    'name': name,
+    'email': email,
+    'birthdate': birthdate?.toIso8601String(),
+    'role': role.name,
+    'branch': branch,
+    'timeBalanceSeconds': timeBalanceSeconds,
+    'isBanned': isBanned,
+    'isWhitelisted': isWhitelisted,
+    'activePackageSlug': activePackageSlug,
+    'includedDrinksRemaining': includedDrinksRemaining,
+    'includedDrinksTotal': includedDrinksTotal,
+  };
 
   factory MemberUser.fromJson(Map<String, dynamic> json) => MemberUser(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        email: json['email'] as String,
-        birthdate: json['birthdate'] != null
-            ? DateTime.parse(json['birthdate'] as String)
-            : null,
-        role: MemberUser.parseRole(json['role'] as String?),
-        branch: json['branch'] as String?,
-        timeBalanceSeconds: json['timeBalanceSeconds'] as int? ?? 0,
-        isBanned: json['isBanned'] as bool? ?? false,
-        isWhitelisted: json['isWhitelisted'] as bool? ?? false,
-        activePackageSlug: json['activePackageSlug'] as String?,
-        includedDrinksRemaining: json['includedDrinksRemaining'] as int? ?? 0,
-        includedDrinksTotal: json['includedDrinksTotal'] as int? ?? 0,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    email: json['email'] as String,
+    birthdate: json['birthdate'] != null
+        ? DateTime.parse(json['birthdate'] as String)
+        : null,
+    role: MemberUser.parseRole(json['role'] as String?),
+    branch: json['branch'] as String?,
+    timeBalanceSeconds: json['timeBalanceSeconds'] as int? ?? 0,
+    isBanned: json['isBanned'] as bool? ?? false,
+    isWhitelisted: json['isWhitelisted'] as bool? ?? false,
+    activePackageSlug: json['activePackageSlug'] as String?,
+    includedDrinksRemaining: json['includedDrinksRemaining'] as int? ?? 0,
+    includedDrinksTotal: json['includedDrinksTotal'] as int? ?? 0,
+  );
 
   factory MemberUser.fromSupabaseProfile(Map<String, dynamic> json) {
     final birthdateRaw = json['birthdate'] as String?;
@@ -111,20 +118,19 @@ class MemberUser {
     String? activePackageSlug,
     int? includedDrinksRemaining,
     int? includedDrinksTotal,
-  }) =>
-      MemberUser(
-        id: id,
-        name: name ?? this.name,
-        email: email,
-        birthdate: birthdate,
-        role: role ?? this.role,
-        branch: branch ?? this.branch,
-        timeBalanceSeconds: timeBalanceSeconds ?? this.timeBalanceSeconds,
-        isBanned: isBanned ?? this.isBanned,
-        isWhitelisted: isWhitelisted ?? this.isWhitelisted,
-        activePackageSlug: activePackageSlug ?? this.activePackageSlug,
-        includedDrinksRemaining:
-            includedDrinksRemaining ?? this.includedDrinksRemaining,
-        includedDrinksTotal: includedDrinksTotal ?? this.includedDrinksTotal,
-      );
+  }) => MemberUser(
+    id: id,
+    name: name ?? this.name,
+    email: email,
+    birthdate: birthdate,
+    role: role ?? this.role,
+    branch: branch ?? this.branch,
+    timeBalanceSeconds: timeBalanceSeconds ?? this.timeBalanceSeconds,
+    isBanned: isBanned ?? this.isBanned,
+    isWhitelisted: isWhitelisted ?? this.isWhitelisted,
+    activePackageSlug: activePackageSlug ?? this.activePackageSlug,
+    includedDrinksRemaining:
+        includedDrinksRemaining ?? this.includedDrinksRemaining,
+    includedDrinksTotal: includedDrinksTotal ?? this.includedDrinksTotal,
+  );
 }

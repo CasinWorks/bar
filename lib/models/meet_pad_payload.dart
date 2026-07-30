@@ -19,12 +19,12 @@ class MeetPadPayload {
   static const type = 'meet_pad';
 
   String encode() => jsonEncode({
-        'type': type,
-        'code': code,
-        'host_name': hostName,
-        'kind': kind == MeetKind.duoBeat ? 'duo_beat' : 'meet_toast',
-        'timestamp': timestamp,
-      });
+    'type': type,
+    'code': code,
+    'host_name': hostName,
+    'kind': kind == MeetKind.duoBeat ? 'duo_beat' : 'meet_toast',
+    'timestamp': timestamp,
+  });
 
   static MeetPadPayload? tryDecode(String raw) {
     try {

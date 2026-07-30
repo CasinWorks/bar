@@ -40,12 +40,17 @@ class _MiniGameModalState extends State<MiniGameModal> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(widget.game.title, style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              widget.game.title,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 8),
             Text(
               widget.game.description,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11),
             ),
             const SizedBox(height: 20),
             _buildGameBody(context),
@@ -53,15 +58,16 @@ class _MiniGameModalState extends State<MiniGameModal> {
               const SizedBox(height: 12),
               Text(
                 '+$_wonPoints PTS',
-                style: const TextStyle(color: AppColors.goldBright, fontWeight: FontWeight.w900, fontSize: 20),
+                style: const TextStyle(
+                  color: AppColors.goldBright,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                ),
               ),
             ],
             const SizedBox(height: 16),
             if (widget.game.id == 'game-3' && !_played)
-              TigerButton(
-                label: 'TAP BEAT',
-                onPressed: () => _play(context),
-              )
+              TigerButton(label: 'TAP BEAT', onPressed: () => _play(context))
             else
               TigerButton(
                 label: _played ? 'CLOSE' : 'PLAY',
@@ -98,8 +104,14 @@ class _MiniGameModalState extends State<MiniGameModal> {
                     ? null
                     : () => setState(() => _selectedGuess = d.id.hashCode),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: selected ? AppColors.goldBright : AppColors.textMuted,
-                  side: BorderSide(color: selected ? AppColors.goldBrushed : AppColors.neutral900),
+                  foregroundColor: selected
+                      ? AppColors.goldBright
+                      : AppColors.textMuted,
+                  side: BorderSide(
+                    color: selected
+                        ? AppColors.goldBrushed
+                        : AppColors.neutral900,
+                  ),
                 ),
                 child: Text(d.name, style: const TextStyle(fontSize: 10)),
               ),
@@ -109,9 +121,18 @@ class _MiniGameModalState extends State<MiniGameModal> {
       case 'game-3':
         return Column(
           children: [
-            Text('TAPS: $_beatTaps / 8', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'TAPS: $_beatTaps / 8',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
-            Icon(Icons.music_note, size: 48, color: _beatTaps.isOdd ? AppColors.tigerOrange : AppColors.goldBrushed),
+            Icon(
+              Icons.music_note,
+              size: 48,
+              color: _beatTaps.isOdd
+                  ? AppColors.tigerOrange
+                  : AppColors.goldBrushed,
+            ),
           ],
         );
       default:

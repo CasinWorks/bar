@@ -129,11 +129,15 @@ class _TipBartenderSheetState extends State<TipBartenderSheet> {
                 const SizedBox(height: 16),
                 Text(
                   'TAP BARTENDER',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineMedium?.copyWith(fontSize: 18),
                 ),
                 Text(
                   'Hold your phone to their tip pad — same energy as NFC.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 11),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -142,7 +146,10 @@ class _TipBartenderSheetState extends State<TipBartenderSheet> {
                     color: AppColors.timerNeon,
                     fontWeight: FontWeight.w900,
                     fontSize: 12,
-                    shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.5),
+                    shadows: AppColors.timerGlow(
+                      AppColors.timerNeon,
+                      intensity: 0.5,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -165,32 +172,32 @@ class _TipBartenderSheetState extends State<TipBartenderSheet> {
   Widget _body() {
     return switch (_phase) {
       _TipPhase.scan => _ScanPhase(
-          controller: _scanner,
-          error: _error,
-          onDetect: _onDetect,
-        ),
+        controller: _scanner,
+        error: _error,
+        onDetect: _onDetect,
+      ),
       _TipPhase.pour => _PourPhase(
-          pad: _pad!,
-          pour: _pour,
-          busy: _busy,
-          error: _error,
-          onSelect: (p) => setState(() => _pour = p),
-          onSend: _sendTip,
-          onRescan: () {
-            setState(() {
-              _phase = _TipPhase.scan;
-              _pad = null;
-              _error = null;
-            });
-            _scanner.start();
-          },
-        ),
+        pad: _pad!,
+        pour: _pour,
+        busy: _busy,
+        error: _error,
+        onSelect: (p) => setState(() => _pour = p),
+        onSend: _sendTip,
+        onRescan: () {
+          setState(() {
+            _phase = _TipPhase.scan;
+            _pad = null;
+            _error = null;
+          });
+          _scanner.start();
+        },
+      ),
       _TipPhase.transferring => const SizedBox.shrink(),
       _TipPhase.done => _DonePhase(
-          gift: _gift!,
-          bartender: _pad!.staffName,
-          onClose: () => Navigator.pop(context),
-        ),
+        gift: _gift!,
+        bartender: _pad!.staffName,
+        onClose: () => Navigator.pop(context),
+      ),
     };
   }
 }
@@ -223,14 +230,20 @@ class _ScanPhase extends StatelessWidget {
                     height: 220,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.goldBrushed, width: 3),
+                      border: Border.all(
+                        color: AppColors.goldBrushed,
+                        width: 3,
+                      ),
                     ),
                   ),
                 ),
                 Positioned(
                   bottom: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(20),
@@ -252,7 +265,10 @@ class _ScanPhase extends StatelessWidget {
         ),
         if (error != null) ...[
           const SizedBox(height: 8),
-          Text(error!, style: const TextStyle(color: AppColors.dangerRed, fontSize: 11)),
+          Text(
+            error!,
+            style: const TextStyle(color: AppColors.dangerRed, fontSize: 11),
+          ),
         ],
       ],
     );
@@ -296,11 +312,16 @@ class _PourPhase extends StatelessWidget {
                   children: [
                     Text(
                       pad.staffName,
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
                     ),
                     Text(
                       'Tip pad locked · ready to pour',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                     ),
                   ],
                 ),
@@ -337,15 +358,27 @@ class _PourPhase extends StatelessWidget {
                                   children: [
                                     Text(
                                       '${p.minutes} MIN · ${p.label}',
-                                      style: const TextStyle(fontWeight: FontWeight.w900),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
-                                    Text(p.tagline, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10)),
+                                    Text(
+                                      p.tagline,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(fontSize: 10),
+                                    ),
                                   ],
                                 ),
                               ),
                               Icon(
-                                pour.id == p.id ? Icons.check_circle : Icons.circle_outlined,
-                                color: pour.id == p.id ? AppColors.goldBrushed : AppColors.neutral500,
+                                pour.id == p.id
+                                    ? Icons.check_circle
+                                    : Icons.circle_outlined,
+                                color: pour.id == p.id
+                                    ? AppColors.goldBrushed
+                                    : AppColors.neutral500,
                               ),
                             ],
                           ),
@@ -358,7 +391,10 @@ class _PourPhase extends StatelessWidget {
           ),
         ),
         if (error != null) ...[
-          Text(error!, style: const TextStyle(color: AppColors.dangerRed, fontSize: 11)),
+          Text(
+            error!,
+            style: const TextStyle(color: AppColors.dangerRed, fontSize: 11),
+          ),
           const SizedBox(height: 8),
         ],
         TigerButton(
@@ -392,7 +428,9 @@ class _DonePhase extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           '${gift.minutes} MINUTES TIPPED',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(fontSize: 18),
         ),
         Text(
           'to $bartender — they just felt that pour.',

@@ -36,8 +36,10 @@ class PushNotificationService {
   void Function(String token)? onDeviceToken;
   void Function(String token)? onApnsToken;
   void Function(Map<String, dynamic> payload)? onNotificationTap;
+
   /// Fired for FCM messages while the app is in the foreground.
   void Function(Map<String, dynamic> data)? onForegroundMessage;
+
   /// When false, skip local OS banners (in-app island handles delivery).
   bool Function()? shouldShowLocalInForeground;
 
@@ -73,7 +75,8 @@ class PushNotificationService {
       );
       await _plugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(channel);
     }
 
@@ -123,13 +126,14 @@ class PushNotificationService {
       final showLocal = shouldShowLocalInForeground?.call() ?? true;
       if (!showLocal) return;
 
-      final title = message.notification?.title ??
+      final title =
+          message.notification?.title ??
           message.data['title'] as String? ??
           'Blind Tiger';
-      final body = message.notification?.body ??
-          message.data['body'] as String? ??
-          '';
-      final id = message.messageId ??
+      final body =
+          message.notification?.body ?? message.data['body'] as String? ?? '';
+      final id =
+          message.messageId ??
           message.data['notification_id'] as String? ??
           title;
       unawaited(showSocialAlert(id: id, title: title, body: body));
@@ -164,7 +168,9 @@ class PushNotificationService {
             }
             break;
           }
-          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          await Future<void>.delayed(
+            Duration(milliseconds: 400 * (attempt + 1)),
+          );
         }
         if (_apnsToken == null) {
           debugPrint(

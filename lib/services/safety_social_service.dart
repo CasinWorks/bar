@@ -337,9 +337,7 @@ class SafetySocialService {
         throw SafetySocialException('Notification unavailable.');
       }
       if (!_localFriendships.contains(_pair(selfId, friendId))) {
-        throw SafetySocialException(
-          'Add them as a friend first — then ping.',
-        );
+        throw SafetySocialException('Add them as a friend first — then ping.');
       }
       final ping = FriendPing(
         id: 'local-ping-${DateTime.now().millisecondsSinceEpoch}',
@@ -392,7 +390,8 @@ class SafetySocialService {
       );
       return (rows as List)
           .map(
-            (r) => FriendPing.fromSupabaseRow(Map<String, dynamic>.from(r as Map)),
+            (r) =>
+                FriendPing.fromSupabaseRow(Map<String, dynamic>.from(r as Map)),
           )
           .toList();
     } catch (e) {
@@ -500,15 +499,13 @@ class SafetySocialService {
         'send_friend_message',
         params: {'p_friend_id': friendId, 'p_body': body},
       );
-      return FriendMessage.fromSupabaseRow(Map<String, dynamic>.from(row as Map));
+      return FriendMessage.fromSupabaseRow(
+        Map<String, dynamic>.from(row as Map),
+      );
     } catch (e) {
       return _runInDemoIfUnavailable(
         e,
-        () => sendFriendMessage(
-          friendId: friendId,
-          selfId: selfId,
-          body: body,
-        ),
+        () => sendFriendMessage(friendId: friendId, selfId: selfId, body: body),
       );
     }
   }
@@ -540,8 +537,9 @@ class SafetySocialService {
       final list = rows as List? ?? const [];
       return list
           .map(
-            (r) =>
-                FriendMessage.fromSupabaseRow(Map<String, dynamic>.from(r as Map)),
+            (r) => FriendMessage.fromSupabaseRow(
+              Map<String, dynamic>.from(r as Map),
+            ),
           )
           .toList();
     } catch (e) {
@@ -567,16 +565,14 @@ class SafetySocialService {
       final list = rows as List? ?? const [];
       return list
           .map(
-            (r) =>
-                FriendProfile.fromSupabaseRow(Map<String, dynamic>.from(r as Map)),
+            (r) => FriendProfile.fromSupabaseRow(
+              Map<String, dynamic>.from(r as Map),
+            ),
           )
           .toList();
     } catch (e) {
       if (_isCloudSchemaUnavailable(e)) {
-        return _runInDemoIfUnavailable(
-          e,
-          () => listMyFriends(selfId: selfId),
-        );
+        return _runInDemoIfUnavailable(e, () => listMyFriends(selfId: selfId));
       }
       throw SafetySocialException(_mapError(e));
     }
@@ -776,10 +772,7 @@ class SafetySocialService {
   Future<void> clearPushTokens({String? token}) async {
     if (!usesCloud) return;
     try {
-      await _client!.rpc(
-        'clear_push_token',
-        params: {'p_token': token},
-      );
+      await _client!.rpc('clear_push_token', params: {'p_token': token});
     } catch (_) {}
   }
 

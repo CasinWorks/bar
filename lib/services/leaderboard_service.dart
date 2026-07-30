@@ -34,16 +34,18 @@ class LeaderboardService {
     final token = Supabase.instance.client.auth.currentSession?.accessToken;
     if (token == null || token.isEmpty) return const [];
 
-    final uri = Uri.parse('${AdminApiConfig.url}/api/leaderboard').replace(
-      queryParameters: {'limit': '$limit'},
-    );
+    final uri = Uri.parse(
+      '${AdminApiConfig.url}/api/leaderboard',
+    ).replace(queryParameters: {'limit': '$limit'});
 
     final client = HttpClient();
     try {
       final request = await client.getUrl(uri);
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      final response = await request.close().timeout(const Duration(seconds: 12));
+      final response = await request.close().timeout(
+        const Duration(seconds: 12),
+      );
       final body = await response.transform(utf8.decoder).join();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('Leaderboard failed (${response.statusCode})');
@@ -84,7 +86,9 @@ class LeaderboardService {
           rank: rankings[i].rank,
           name: rankings[i].name,
           points: rankings[i].timeBalanceSeconds ~/ 60,
-          tier: MemberTierThresholds.tierForSeconds(rankings[i].timeBalanceSeconds),
+          tier: MemberTierThresholds.tierForSeconds(
+            rankings[i].timeBalanceSeconds,
+          ),
           isCurrentUser: rankings[i].isCurrentUser,
           avatarColor: palette[i % palette.length],
           avatarGlyph: rankings[i].name.isNotEmpty

@@ -15,11 +15,11 @@ class TipPadPayload {
   static const type = 'tip_pad';
 
   String encode() => jsonEncode({
-        'type': type,
-        'staff_id': staffId,
-        'staff_name': staffName,
-        'timestamp': timestamp,
-      });
+    'type': type,
+    'staff_id': staffId,
+    'staff_name': staffName,
+    'timestamp': timestamp,
+  });
 
   static TipPadPayload? tryDecode(String raw) {
     try {

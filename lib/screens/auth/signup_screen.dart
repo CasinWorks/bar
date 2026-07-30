@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../providers/app_state.dart';
 import '../../services/auth_service.dart';
@@ -141,11 +142,11 @@ class _SignupScreenState extends State<SignupScreen>
 
     try {
       final result = await context.read<AppState>().signUp(
-            name: _name.text,
-            email: _email.text,
-            password: _password.text,
-            birthdate: _birthdate!,
-          );
+        name: _name.text,
+        email: _email.text,
+        password: _password.text,
+        birthdate: _birthdate!,
+      );
       if (!mounted) return;
       HapticFeedback.mediumImpact();
 
@@ -654,23 +655,7 @@ class _SealStep extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.goldBright),
-                    color: AppColors.goldBrushed.withValues(alpha: 0.1),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '虎',
-                    style: GoogleFonts.cinzel(
-                      fontSize: 28,
-                      color: AppColors.goldBright,
-                    ),
-                  ),
-                ),
+                const AppLogo(size: 64),
                 const SizedBox(height: 14),
                 Text(
                   name.isEmpty ? 'New member' : name,
@@ -735,8 +720,8 @@ class _SealStep extends StatelessWidget {
                   child: Text(
                     'Privacy Policy',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          decoration: TextDecoration.underline,
-                        ),
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
                 Text(' and ', style: Theme.of(context).textTheme.bodySmall),
@@ -750,8 +735,8 @@ class _SealStep extends StatelessWidget {
                   child: Text(
                     'Terms of Use',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          decoration: TextDecoration.underline,
-                        ),
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
               ],

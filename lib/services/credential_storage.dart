@@ -33,10 +33,7 @@ class CredentialStorage {
     return SavedCredentials(email: email, password: password, remember: true);
   }
 
-  Future<void> save({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> save({required String email, required String password}) async {
     await _storage.write(key: _rememberKey, value: 'true');
     await _storage.write(key: _emailKey, value: email.trim().toLowerCase());
     await _storage.write(key: _passwordKey, value: password);

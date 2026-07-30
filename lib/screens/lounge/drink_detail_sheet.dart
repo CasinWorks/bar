@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
-import '../../core/widgets/time_refill_overlay.dart';
 import '../../models/blind_tiger_models.dart';
 import '../../models/club_session.dart';
+import '../../models/drink_order.dart';
 import '../../providers/app_state.dart';
 
 class DrinkDetailSheet extends StatefulWidget {
@@ -48,54 +49,39 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
       _error = null;
     });
 
-    final beforeSeconds = appState.spendableTimeSeconds;
-    final beforeDrinks = appState.drinksAllowanceRemaining;
-    final ok = await appState.orderDrink(drink, payWithCash: payWithCash);
+    final inVipBefore = appState.isInVipRoom;
+
+    final order = await appState.placeDrinkOrder(
+      drink,
+      payWithCash: payWithCash,
+    );
 
     if (!mounted) return;
 
-    if (!ok) {
+    if (order == null) {
       setState(() {
         _ordering = false;
         _error = payWithCash
             ? 'Could not place cash order. Try again.'
-            : drink.isStandard
-                ? 'No package drinks left — or order failed.'
-                : 'Not enough time — or order failed. Try again.';
+            : inVipBefore
+            ? 'Not enough VIP room tab time — or order failed.'
+            : 'Not enough time — or order failed. Try again.';
       });
       return;
     }
 
-    final afterSeconds = context.read<AppState>().spendableTimeSeconds;
-    final afterDrinks = context.read<AppState>().drinksAllowanceRemaining;
-
-    if (!payWithCash && !drink.isStandard) {
-      await TimeRefillOverlay.show(
-        context,
-        fromSeconds: beforeSeconds,
-        toSeconds: afterSeconds,
-        title: 'ROUND POURED',
-        subtitle: '${drink.name} · −${drink.timeCostSeconds ~/ 60} min',
-      );
-    } else if (drink.isStandard) {
-      await TimeRefillOverlay.show(
-        context,
-        fromSeconds: beforeSeconds,
-        toSeconds: afterSeconds,
-        title: 'ROUND POURED',
-        subtitle: '${drink.name} · package drink ($afterDrinks left, was $beforeDrinks)',
-      );
-    }
-
+    HapticFeedback.mediumImpact();
     if (!mounted) return;
+    setState(() => _ordering = false);
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           payWithCash
-              ? '${drink.name} — settle at the bar.'
-              : '${drink.name} ordered!',
+              ? '${drink.name} sent to bar — pay when it arrives.'
+              : '${drink.name} sent to bar — track it at the top.',
         ),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -104,24 +90,33 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final inside = state.sessionPhase == SessionPhase.insideClub;
-    final canPackage = inside &&
-        drink.isStandard &&
-        state.drinksAllowanceRemaining > 0;
-    final canMinutes = inside &&
-        !drink.isStandard &&
-        state.spendableTimeSeconds >= drink.timeCostSeconds;
-    final canCash = inside && !drink.isStandard;
+    final inVip = state.isInVipRoom;
+    final costSec = state.drinkOrderCostSeconds(drink);
+    final chargeSource = state.chargeSourceForDrink(drink);
+    final canAfford = state.canAffordDrink(drink);
+    final canCash = inside;
     final blocked = _ordering || state.isWalletBusy;
 
     String primaryLabel;
     if (!inside) {
       primaryLabel = 'ENTER CLUB FIRST';
-    } else if (drink.isStandard) {
-      primaryLabel = canPackage ? 'ORDER (PACKAGE)' : 'NO DRINKS LEFT';
-    } else if (canMinutes) {
-      primaryLabel = 'ORDER (−${drink.timeCostSeconds ~/ 60} MIN)';
-    } else {
+    } else if (inVip) {
+      primaryLabel = canAfford
+          ? 'SEND TO BAR (−${costSec ~/ 60} MIN · TAB)'
+          : 'ROOM TAB EMPTY';
+    } else if (!canAfford) {
       primaryLabel = 'NOT ENOUGH TIME';
+    } else {
+      primaryLabel = switch (chargeSource) {
+        DrinkChargeSource.packageAllowance => 'SEND TO BAR (PACKAGE)',
+        DrinkChargeSource.eventWallet =>
+          'SEND TO BAR (−${costSec ~/ 60} MIN · EVENT)',
+        DrinkChargeSource.personalTime =>
+          'SEND TO BAR (−${costSec ~/ 60} MIN)',
+        DrinkChargeSource.vipRoomTab =>
+          'SEND TO BAR (−${costSec ~/ 60} MIN · TAB)',
+        DrinkChargeSource.cashAtBar => 'SEND TO BAR (PAY AT BAR)',
+      };
     }
 
     return ConstrainedBox(
@@ -149,7 +144,10 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 gradient: LinearGradient(
-                  colors: [Color(drink.imageColorStart), Color(drink.imageColorEnd)],
+                  colors: [
+                    Color(drink.imageColorStart),
+                    Color(drink.imageColorEnd),
+                  ],
                 ),
               ),
               child: Center(
@@ -171,26 +169,53 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
                   color: AppColors.goldBrushed.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text(drink.badge!, style: const TextStyle(fontSize: 9, color: AppColors.goldBright)),
+                child: Text(
+                  drink.badge!,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.goldBright,
+                  ),
+                ),
               ),
             Text(drink.name, style: Theme.of(context).textTheme.headlineMedium),
             Text(
               '${drink.flavor} • ${drink.abv}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.goldBright),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.goldBright),
             ),
             const SizedBox(height: 12),
-            Text(drink.description, style: Theme.of(context).textTheme.bodyMedium),
+            Text(
+              drink.description,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             const SizedBox(height: 16),
-            Text('INGREDIENTS', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9)),
+            Text(
+              'INGREDIENTS',
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontSize: 9),
+            ),
             const SizedBox(height: 8),
             ...drink.ingredients.map(
               (i) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.circle, size: 6, color: AppColors.goldBrushed),
+                    const Icon(
+                      Icons.circle,
+                      size: 6,
+                      color: AppColors.goldBrushed,
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(i, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11))),
+                    Expanded(
+                      child: Text(
+                        i,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -200,9 +225,9 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
               child: Text(
                 drink.bartenderQuote,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.goldBright,
-                    ),
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.goldBright,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -211,18 +236,30 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
               children: [
                 Text(
                   drink.price,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.tigerRed,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: AppColors.tigerRed),
                 ),
                 Text(
-                  drink.isStandard
-                      ? 'Uses 1 package drink · ${state.drinksAllowanceRemaining} left'
-                      : '−${drink.timeCostSeconds ~/ 60} min · or pay at bar',
+                  switch (chargeSource) {
+                    DrinkChargeSource.vipRoomTab =>
+                      '−${costSec ~/ 60} min · VIP tab on serve',
+                    DrinkChargeSource.eventWallet =>
+                      '−${costSec ~/ 60} min · event wallet on serve',
+                    DrinkChargeSource.packageAllowance =>
+                      'Package drink · charged when served',
+                    DrinkChargeSource.personalTime =>
+                      '−${costSec ~/ 60} min · charged when served',
+                    DrinkChargeSource.cashAtBar => 'Pay at the bar',
+                  },
                   style: TextStyle(
-                    color: drink.isStandard
-                        ? AppColors.timerHealthy
-                        : AppColors.tigerRed,
+                    color: switch (chargeSource) {
+                      DrinkChargeSource.vipRoomTab => const Color(0xFF9B59B6),
+                      DrinkChargeSource.eventWallet => AppColors.goldBright,
+                      DrinkChargeSource.packageAllowance =>
+                        AppColors.timerHealthy,
+                      _ => AppColors.tigerRed,
+                    },
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -233,7 +270,10 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
               const SizedBox(height: 10),
               Text(
                 _error!,
-                style: const TextStyle(color: AppColors.tigerOrange, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.tigerOrange,
+                  fontSize: 12,
+                ),
               ),
             ],
             const SizedBox(height: 16),
@@ -241,11 +281,11 @@ class _DrinkDetailSheetState extends State<DrinkDetailSheet> {
               label: primaryLabel,
               icon: Icons.local_bar,
               isLoading: _ordering,
-              onPressed: (!blocked && (canPackage || canMinutes))
+              onPressed: (!blocked && canAfford)
                   ? () => _order(payWithCash: false)
                   : null,
             ),
-            if (!drink.isStandard) ...[
+            if (chargeSource != DrinkChargeSource.packageAllowance) ...[
               const SizedBox(height: 8),
               TigerButton(
                 label: 'PAY AT BAR (CASH)',

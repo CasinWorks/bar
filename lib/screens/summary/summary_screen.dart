@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../models/club_session.dart';
+import '../../models/time_economy.dart';
+import '../../models/quest_system.dart';
 import '../../providers/app_state.dart';
 
 class SummaryScreen extends StatefulWidget {
@@ -69,33 +71,83 @@ class _SummaryScreenState extends State<SummaryScreen> {
     final balance = _frozenBalance ?? state.timeBalance;
     final balanceLabel =
         _frozenFormattedBalance ?? state.formatDuration(balance);
+    final recap = state.visitRecap;
 
     return Scaffold(
       body: LatticeBackground(
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                const Icon(Icons.check_circle, color: AppColors.successGreen, size: 48),
-                const SizedBox(height: 12),
-                Text('HOW YOU SPENT YOUR NIGHT', style: Theme.of(context).textTheme.headlineLarge),
-                Text(
-                  'Thank you for visiting Blind Tiger Club District.',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                const Icon(
+                  Icons.check_circle,
+                  color: AppColors.successGreen,
+                  size: 48,
                 ),
-                if (balance > 0) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '$balanceLabel saved for your next visit. Extend your time anytime.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.timerHealthy,
-                          fontSize: 11,
+                const SizedBox(height: 12),
+                Text(
+                  'YOUR NIGHT RECAP',
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+                Text(
+                  'Time creates reputation. Reputation unlocks experiences.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                LuxuryCard(
+                  child: Column(
+                    children: [
+                      _Row('People met', '${recap.peopleMet}'),
+                      _Row('XP gained', '+${recap.xpGained}'),
+                      _Row('Time gifted', '${recap.timeGiftedMinutes} min'),
+                      _Row('Time received', '${recap.timeReceivedMinutes} min'),
+                      _Row('Events joined', '${recap.eventsJoined}'),
+                      _Row('Quests completed', '${recap.questsCompleted}'),
+                      _Row('Reputation', state.reputationLevel.label),
+                      _Row(
+                        'Banked time',
+                        state.formatDuration(state.timeWallet.bankedSeconds),
+                      ),
+                    ],
+                  ),
+                ),
+                if (recap.achievementsUnlocked.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  LuxuryCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ACHIEVEMENTS UNLOCKED',
+                          style: Theme.of(context).textTheme.labelLarge,
                         ),
-                    textAlign: TextAlign.center,
+                        const SizedBox(height: 8),
+                        ...recap.achievementsUnlocked.map(
+                          (id) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  id.icon,
+                                  size: 14,
+                                  color: AppColors.goldBright,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  id.label,
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 if (session != null)
                   LuxuryCard(
                     child: Column(
@@ -143,7 +195,17 @@ class _SummaryScreenState extends State<SummaryScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                const Spacer(),
+                const SizedBox(height: 24),
+                if (balance > 0)
+                  Text(
+                    '$balanceLabel banked for your next visit.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.timerHealthy,
+                      fontSize: 11,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                const SizedBox(height: 16),
                 if (state.canPurchaseNewPass)
                   TigerButton(
                     label: 'PURCHASE NEW PASS',
@@ -166,7 +228,9 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Need more time? Ask the house to load a package at the club.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -177,6 +241,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
                   },
                   child: const Text('Sign Out'),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),

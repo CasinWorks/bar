@@ -74,9 +74,18 @@ abstract final class AppColors {
   static List<Shadow> timerGlow(Color color, {double intensity = 1}) {
     final i = intensity.clamp(0.4, 1.6);
     return [
-      Shadow(color: color.withValues(alpha: 0.85 * i), blurRadius: 2 * i),
-      Shadow(color: color.withValues(alpha: 0.55 * i), blurRadius: 10 * i),
-      Shadow(color: color.withValues(alpha: 0.28 * i), blurRadius: 22 * i),
+      Shadow(
+        color: color.withValues(alpha: 0.85 * i),
+        blurRadius: 2 * i,
+      ),
+      Shadow(
+        color: color.withValues(alpha: 0.55 * i),
+        blurRadius: 10 * i,
+      ),
+      Shadow(
+        color: color.withValues(alpha: 0.28 * i),
+        blurRadius: 22 * i,
+      ),
     ];
   }
 
@@ -100,14 +109,14 @@ enum TimerBand {
   low;
 
   String get label => switch (this) {
-        TimerBand.healthy => 'PLENTY',
-        TimerBand.caution => 'STEADY',
-        TimerBand.low => 'EXTEND',
-      };
+    TimerBand.healthy => 'PLENTY',
+    TimerBand.caution => 'STEADY',
+    TimerBand.low => 'EXTEND',
+  };
 
   String get guestHint => switch (this) {
-        TimerBand.healthy => 'Your night is open.',
-        TimerBand.caution => 'Time is getting shorter — extend when you\'re ready.',
-        TimerBand.low => 'Extend your time.',
-      };
+    TimerBand.healthy => 'Your night is open.',
+    TimerBand.caution => 'Time is getting shorter — extend when you\'re ready.',
+    TimerBand.low => 'Extend your time.',
+  };
 }

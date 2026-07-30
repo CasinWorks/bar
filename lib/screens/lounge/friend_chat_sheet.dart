@@ -62,8 +62,8 @@ class _FriendChatSheetState extends State<FriendChatSheet> {
     if (!silent) setState(() => _loading = true);
     try {
       final messages = await context.read<AppState>().loadFriendChat(
-            widget.profile.memberId,
-          );
+        widget.profile.memberId,
+      );
       if (!mounted) return;
       final jumped = messages.length != _messages.length;
       setState(() {
@@ -99,9 +99,9 @@ class _FriendChatSheetState extends State<FriendChatSheet> {
     if (body.isEmpty || _sending) return;
     setState(() => _sending = true);
     final error = await context.read<AppState>().sendFriendChatMessage(
-          widget.profile.memberId,
-          body,
-        );
+      widget.profile.memberId,
+      body,
+    );
     if (!mounted) return;
     setState(() => _sending = false);
     if (error != null) {
@@ -166,57 +166,58 @@ class _FriendChatSheetState extends State<FriendChatSheet> {
                     child: _loading
                         ? const Center(child: CircularProgressIndicator())
                         : _messages.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'Say hello — private between friends.',
-                                  style: TextStyle(color: AppColors.textMuted),
-                                  textAlign: TextAlign.center,
-                                ),
-                              )
-                            : ListView.builder(
-                                controller: _scroll,
-                                itemCount: _messages.length,
-                                itemBuilder: (context, index) {
-                                  final msg = _messages[index];
-                                  final mine = msg.senderId == selfId;
-                                  return Align(
-                                    alignment: mine
-                                        ? Alignment.centerRight
-                                        : Alignment.centerLeft,
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 8),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      constraints: BoxConstraints(
-                                        maxWidth:
-                                            MediaQuery.sizeOf(context).width *
-                                                0.68,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        color: mine
-                                            ? AppColors.goldBrushed
-                                                .withValues(alpha: 0.28)
-                                            : const Color(0xFF24160C),
-                                        border: Border.all(
-                                          color: AppColors.goldBrushed
-                                              .withValues(alpha: 0.25),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        msg.body,
-                                        style: const TextStyle(
-                                          color: AppColors.textLight,
-                                          fontSize: 13,
-                                          height: 1.35,
-                                        ),
+                        ? const Center(
+                            child: Text(
+                              'Say hello — private between friends.',
+                              style: TextStyle(color: AppColors.textMuted),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scroll,
+                            itemCount: _messages.length,
+                            itemBuilder: (context, index) {
+                              final msg = _messages[index];
+                              final mine = msg.senderId == selfId;
+                              return Align(
+                                alignment: mine
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  constraints: BoxConstraints(
+                                    maxWidth:
+                                        MediaQuery.sizeOf(context).width * 0.68,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: mine
+                                        ? AppColors.goldBrushed.withValues(
+                                            alpha: 0.28,
+                                          )
+                                        : const Color(0xFF24160C),
+                                    border: Border.all(
+                                      color: AppColors.goldBrushed.withValues(
+                                        alpha: 0.25,
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
+                                  ),
+                                  child: Text(
+                                    msg.body,
+                                    style: const TextStyle(
+                                      color: AppColors.textLight,
+                                      fontSize: 13,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -243,7 +244,9 @@ class _FriendChatSheetState extends State<FriendChatSheet> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.send_rounded),
                       ),

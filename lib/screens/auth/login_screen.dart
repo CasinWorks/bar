@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../providers/app_state.dart';
 import '../../router/member_routes.dart';
@@ -20,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _password = TextEditingController();
   final _credentials = CredentialStorage();
   bool _loading = false;
-  bool _rememberMe = false;
+  bool _rememberMe = true;
   bool _loadingSaved = true;
   String? _error;
 
@@ -60,10 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _password.text;
 
     try {
-      await context.read<AppState>().login(
-            email: email,
-            password: password,
-          );
+      await context.read<AppState>().login(email: email, password: password);
 
       if (_rememberMe) {
         await _credentials.save(email: email, password: password);
@@ -93,7 +91,12 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Welcome back.', style: Theme.of(context).textTheme.headlineLarge),
+                const Center(child: AppLogo(size: 72)),
+                const SizedBox(height: 20),
+                Text(
+                  'Welcome back.',
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   _rememberMe && _email.text.isNotEmpty
@@ -132,26 +135,32 @@ class _LoginScreenState extends State<LoginScreen> {
                     value: _rememberMe,
                     onChanged: _loading
                         ? null
-                        : (value) => setState(() => _rememberMe = value ?? false),
+                        : (value) =>
+                              setState(() => _rememberMe = value ?? false),
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
                     activeColor: AppColors.goldBrushed,
                     title: Text(
-                      'Remember me',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
+                      'Remember email & password',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(fontSize: 13),
                     ),
                     subtitle: Text(
-                      'Save email and password on this device',
+                      'Optional autofill — your session already stays signed in',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontSize: 10,
-                            color: AppColors.textMuted,
-                          ),
+                        fontSize: 10,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                   ),
                 ],
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: AppColors.dangerRed)),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: AppColors.dangerRed),
+                  ),
                 ],
                 const Spacer(),
                 TigerButton(

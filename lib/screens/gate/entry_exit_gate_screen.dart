@@ -99,97 +99,93 @@ class _EntryGateScreenState extends State<EntryGateScreen> {
                     ),
                   )
                 else ...[
-                _QrCard(data: qr.encode(), purpose: QrPurpose.entry),
-                const SizedBox(height: 16),
-                LuxuryCard(
-                  child: Column(
+                  _QrCard(data: qr.encode(), purpose: QrPurpose.entry),
+                  const SizedBox(height: 16),
+                  LuxuryCard(
+                    child: Column(
+                      children: [
+                        Text(
+                          'SESSION CODE',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.labelLarge?.copyWith(fontSize: 9),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          session.displayCode,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${session.memberName} • ${session.branch}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        Text(
+                          session.amountPaid > 0
+                              ? '${session.purchasedSeconds ~/ 60} min pass • ₱${session.amountPaid}'
+                              : '${session.purchasedSeconds ~/ 60} min • from wallet',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.goldBright),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Row(
                     children: [
-                      Text(
-                        'SESSION CODE',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelLarge
-                            ?.copyWith(fontSize: 9),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        session.displayCode,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 4,
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.goldBrushed,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${session.memberName} • ${session.branch}',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      Text(
-                        session.amountPaid > 0
-                            ? '${session.purchasedSeconds ~/ 60} min pass • ₱${session.amountPaid}'
-                            : '${session.purchasedSeconds ~/ 60} min • from wallet',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: AppColors.goldBright),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Waiting for door scan… Your timer starts after entry.',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const Spacer(),
-                Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.goldBrushed,
+                  const SizedBox(height: 16),
+                  Text(
+                    'QR refreshes every 45 seconds for security',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TigerButton(
+                          label: 'GO BACK',
+                          icon: Icons.arrow_back,
+                          secondary: true,
+                          onPressed: () =>
+                              _showEntryCancelDialog(context, state),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Waiting for door scan… Your timer starts after entry.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontSize: 12),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TigerButton(
+                          label: 'SIGN OUT',
+                          icon: Icons.logout,
+                          secondary: true,
+                          onPressed: () => _signOutFromEntry(context, state),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'QR refreshes every 45 seconds for security',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(fontSize: 10),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TigerButton(
-                        label: 'GO BACK',
-                        icon: Icons.arrow_back,
-                        secondary: true,
-                        onPressed: () => _showEntryCancelDialog(context, state),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TigerButton(
-                        label: 'SIGN OUT',
-                        icon: Icons.logout,
-                        secondary: true,
-                        onPressed: () => _signOutFromEntry(context, state),
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 ],
               ],
             ),
@@ -296,17 +292,17 @@ class ExitGateScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                if (qr != null) _QrCard(data: qr.encode(), purpose: QrPurpose.exit),
+                if (qr != null)
+                  _QrCard(data: qr.encode(), purpose: QrPurpose.exit),
                 const SizedBox(height: 16),
                 LuxuryCard(
                   child: Column(
                     children: [
                       Text(
                         'EXIT CODE',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelLarge
-                            ?.copyWith(fontSize: 9),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelLarge?.copyWith(fontSize: 9),
                       ),
                       Text(
                         session.displayCode,
@@ -319,7 +315,8 @@ class ExitGateScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         'Time remaining: ${state.formatDuration(state.timeRemaining)}',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               color: AppColors.timerNeon,
                               shadows: AppColors.timerGlow(
                                 AppColors.timerNeon,
@@ -333,15 +330,18 @@ class ExitGateScreen extends StatelessWidget {
                 const Spacer(),
                 Row(
                   children: [
-                    const Icon(Icons.shield, color: AppColors.goldBright, size: 18),
+                    const Icon(
+                      Icons.shield,
+                      color: AppColors.goldBright,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Time still counts until door staff scans. Holding this QR does not pause the meter.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontSize: 12),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 12),
                       ),
                     ),
                   ],
@@ -385,10 +385,7 @@ class ExitGateScreen extends StatelessWidget {
 
 /// Triple-tap the door header to skip staff scan (2-phone testing).
 class _SecretDoorKnock extends StatefulWidget {
-  const _SecretDoorKnock({
-    required this.child,
-    required this.onUnlocked,
-  });
+  const _SecretDoorKnock({required this.child, required this.onUnlocked});
 
   final Widget child;
   final Future<void> Function() onUnlocked;
@@ -446,15 +443,18 @@ class _QrCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        purpose == QrPurpose.entry ? AppColors.successGreen : AppColors.tigerOrange;
+    final color = purpose == QrPurpose.entry
+        ? AppColors.successGreen
+        : AppColors.tigerOrange;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color, width: 3),
-        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 20)],
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 20),
+        ],
       ),
       child: Column(
         children: [

@@ -45,7 +45,8 @@ class QrService {
     );
     if (payload.signature != expected) return false;
 
-    final age = DateTime.now().millisecondsSinceEpoch ~/ 1000 - payload.timestamp;
+    final age =
+        DateTime.now().millisecondsSinceEpoch ~/ 1000 - payload.timestamp;
     return age < 120; // 2-minute QR refresh window
   }
 }

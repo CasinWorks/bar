@@ -104,60 +104,61 @@ class _FriendsChatsSheetState extends State<FriendsChatsSheet> {
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
                       : _friends.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No friends yet. Add someone first.',
-                                style: TextStyle(color: AppColors.textMuted),
+                      ? const Center(
+                          child: Text(
+                            'No friends yet. Add someone first.',
+                            style: TextStyle(color: AppColors.textMuted),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _friends.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final friend = _friends[index];
+                            return ListTile(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: AppColors.goldBrushed.withValues(
+                                    alpha: 0.25,
+                                  ),
+                                ),
                               ),
-                            )
-                          : ListView.separated(
-                              itemCount: _friends.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (context, index) {
-                                final friend = _friends[index];
-                                return ListTile(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(
-                                      color: AppColors.goldBrushed
-                                          .withValues(alpha: 0.25),
-                                    ),
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: AppColors.goldBrushed
-                                        .withValues(alpha: 0.24),
-                                    child: Text(
-                                      friend.displayName.isNotEmpty
-                                          ? friend.displayName[0].toUpperCase()
-                                          : '?',
-                                      style: const TextStyle(
-                                        color: AppColors.goldBright,
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(friend.displayName),
-                                  subtitle: Text(
-                                    friend.isNearby
-                                        ? 'Nearby · tap to chat'
-                                        : 'Tap to chat',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  trailing: const Icon(
-                                    Icons.chat_bubble_outline,
+                              leading: CircleAvatar(
+                                backgroundColor: AppColors.goldBrushed
+                                    .withValues(alpha: 0.24),
+                                child: Text(
+                                  friend.displayName.isNotEmpty
+                                      ? friend.displayName[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
                                     color: AppColors.goldBright,
                                   ),
-                                  onTap: () {
-                                    final overlay =
-                                        Navigator.of(context).overlay?.context;
-                                    Navigator.pop(context);
-                                    if (overlay != null) {
-                                      FriendChatSheet.show(overlay, friend);
-                                    }
-                                  },
-                                );
+                                ),
+                              ),
+                              title: Text(friend.displayName),
+                              subtitle: Text(
+                                friend.isNearby
+                                    ? 'Nearby · tap to chat'
+                                    : 'Tap to chat',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              trailing: const Icon(
+                                Icons.chat_bubble_outline,
+                                color: AppColors.goldBright,
+                              ),
+                              onTap: () {
+                                final overlay = Navigator.of(
+                                  context,
+                                ).overlay?.context;
+                                Navigator.pop(context);
+                                if (overlay != null) {
+                                  FriendChatSheet.show(overlay, friend);
+                                }
                               },
-                            ),
+                            );
+                          },
+                        ),
                 ),
               ],
             ),

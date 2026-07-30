@@ -14,6 +14,7 @@ class AnimatedTimeDisplay extends StatefulWidget {
     this.fontWeight = FontWeight.w900,
     this.letterSpacing = 2,
     this.onAnimationComplete,
+
     /// When true, count down spends (used by ROUND POURED / TIME SPENT overlays).
     this.animateDecreases = false,
   });
@@ -53,7 +54,8 @@ class _AnimatedTimeDisplayState extends State<AnimatedTimeDisplay>
       }
     });
 
-    if (widget.initialSeconds != null && widget.initialSeconds != widget.seconds) {
+    if (widget.initialSeconds != null &&
+        widget.initialSeconds != widget.seconds) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _animateTo(widget.seconds);
       });
@@ -108,9 +110,10 @@ class _AnimatedTimeDisplayState extends State<AnimatedTimeDisplay>
     }
 
     _controller.duration = TimeAnimation.durationForDelta(delta);
-    _tween = Tween<double>(begin: _from.toDouble(), end: _to.toDouble()).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    _tween = Tween<double>(
+      begin: _from.toDouble(),
+      end: _to.toDouble(),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward(from: 0);
   }
 

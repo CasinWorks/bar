@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -6,9 +8,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../models/club_session.dart';
 import '../../models/qr_payload.dart';
+import '../../models/staff_door_scan_result.dart';
 import '../../providers/app_state.dart';
 import '../../services/tiger_sound_service.dart';
 
+import 'bartender_bar_screen.dart';
 import 'bartender_tip_pad_screen.dart';
 
 enum _ScannerPhase { scanning, pending, success }
@@ -33,6 +37,7 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
   QrPayload? _pendingPayload;
   String? _pendingManualLabel;
   String? _lastResult;
+  StaffDoorScanResult? _lastScanResult;
   String? _error;
 
   @override
@@ -42,7 +47,10 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _successScale = CurvedAnimation(parent: _successAnim, curve: Curves.elasticOut);
+    _successScale = CurvedAnimation(
+      parent: _successAnim,
+      curve: Curves.elasticOut,
+    );
     _successFade = CurvedAnimation(
       parent: _successAnim,
       curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
@@ -100,10 +108,13 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
       return;
     }
 
+    // Inside-club manual codes use entry so staff can re-trigger event
+    // check-in / welcome replay without forcing an exit. True exits still
+    // come from the lounge exit QR.
     final purpose = switch (session.phase) {
       SessionPhase.paidAwaitingEntry => QrPurpose.entry,
       SessionPhase.awaitingExitScan => QrPurpose.exit,
-      SessionPhase.insideClub => QrPurpose.exit,
+      SessionPhase.insideClub => QrPurpose.entry,
       _ => null,
     };
 
@@ -133,13 +144,13 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
     if (payload == null) return;
 
     final state = context.read<AppState>();
-    final error = await state.staffConfirmScan(payload);
+    final (result, error) = await state.staffConfirmScan(payload);
 
     if (!mounted) return;
 
-    if (error != null) {
+    if (error != null || result == null) {
       setState(() {
-        _error = error;
+        _error = error ?? 'Unable to confirm scan.';
         _pendingPayload = null;
         _pendingManualLabel = null;
         _phase = _ScannerPhase.scanning;
@@ -149,9 +160,9 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
       return;
     }
 
-    final label = payload.purpose == QrPurpose.entry ? 'ENTRY' : 'EXIT';
     setState(() {
-      _lastResult = '${payload.memberName} — $label confirmed';
+      _lastResult = result.successMessage;
+      _lastScanResult = result;
       _pendingPayload = null;
       _pendingManualLabel = null;
       _codeController.clear();
@@ -176,6 +187,7 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
     _successAnim.reset();
     setState(() {
       _lastResult = null;
+      _lastScanResult = null;
       _phase = _ScannerPhase.scanning;
       _error = null;
     });
@@ -195,11 +207,24 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
             if (state.user != null)
               Text(
                 state.user!.name,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 11),
               ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.local_bar),
+            tooltip: 'Bar queue',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const BartenderBarScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.nfc),
             tooltip: 'Tip pad',
@@ -247,12 +272,16 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
                         child: Container(
                           margin: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.goldBrushed, width: 2),
+                            border: Border.all(
+                              color: AppColors.goldBrushed,
+                              width: 2,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                       ),
-                    if (_phase == _ScannerPhase.pending && _pendingPayload != null)
+                    if (_phase == _ScannerPhase.pending &&
+                        _pendingPayload != null)
                       _PendingOverlay(
                         payload: _pendingPayload!,
                         manualCode: _pendingManualLabel,
@@ -262,6 +291,7 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
                     if (_phase == _ScannerPhase.success)
                       _SuccessOverlay(
                         message: _lastResult ?? 'Confirmed',
+                        result: _lastScanResult,
                         scale: _successScale,
                         fade: _successFade,
                         onReady: _readyForNextGuest,
@@ -276,12 +306,17 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (_error != null) ...[
-                    Text(_error!, style: const TextStyle(color: AppColors.dangerRed)),
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.dangerRed),
+                    ),
                     const SizedBox(height: 8),
                   ],
                   Text(
                     'Manual session code',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(fontSize: 9),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -291,14 +326,20 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
                           controller: _codeController,
                           enabled: _phase == _ScannerPhase.scanning,
                           textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(hintText: 'XXXXXXXX'),
+                          decoration: const InputDecoration(
+                            hintText: 'XXXXXXXX',
+                          ),
                           onSubmitted: (_) => _lookupManualCode(),
                         ),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
-                        onPressed: _phase == _ScannerPhase.scanning ? _lookupManualCode : null,
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.crimson),
+                        onPressed: _phase == _ScannerPhase.scanning
+                            ? _lookupManualCode
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.crimson,
+                        ),
                         child: const Text('LOOKUP'),
                       ),
                     ],
@@ -321,20 +362,20 @@ class _StatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final (color, text, icon) = switch (phase) {
       _ScannerPhase.scanning => (
-          AppColors.successGreen,
-          'Ready — scan any guest QR (entry or exit auto-detected)',
-          Icons.qr_code_scanner,
-        ),
+        AppColors.successGreen,
+        'Ready — scan any guest QR (entry or exit auto-detected)',
+        Icons.qr_code_scanner,
+      ),
       _ScannerPhase.pending => (
-          AppColors.goldBright,
-          'Review guest — confirm or cancel if miscanned',
-          Icons.pending_actions,
-        ),
+        AppColors.goldBright,
+        'Review guest — confirm or cancel if miscanned',
+        Icons.pending_actions,
+      ),
       _ScannerPhase.success => (
-          AppColors.successGreen,
-          'Confirmed — tap button below when ready for next guest',
-          Icons.check_circle,
-        ),
+        AppColors.successGreen,
+        'Confirmed — tap button below when ready for next guest',
+        Icons.check_circle,
+      ),
     };
 
     return Container(
@@ -352,7 +393,9 @@ class _StatusBanner extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11, color: color),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11, color: color),
             ),
           ),
         ],
@@ -387,9 +430,21 @@ class _PendingOverlay extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(isEntry ? Icons.door_front_door : Icons.logout, color: color, size: 48),
+            Icon(
+              isEntry ? Icons.door_front_door : Icons.logout,
+              color: color,
+              size: 48,
+            ),
             const SizedBox(height: 12),
-            Text(action, style: TextStyle(color: color, fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 14)),
+            Text(
+              action,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+                fontSize: 14,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               payload.memberName,
@@ -397,14 +452,23 @@ class _PendingOverlay extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             if (manualCode != null)
-              Text('Code: $manualCode', style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                'Code: $manualCode',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             const SizedBox(height: 8),
             Text(
               'Confirm this scan is correct',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 11),
             ),
             const SizedBox(height: 24),
-            TigerButton(label: 'CONFIRM $action', icon: Icons.check, onPressed: onConfirm),
+            TigerButton(
+              label: 'CONFIRM $action',
+              icon: Icons.check,
+              onPressed: onConfirm,
+            ),
             const SizedBox(height: 10),
             TigerButton(
               label: 'CANCEL — MISCAN',
@@ -419,65 +483,227 @@ class _PendingOverlay extends StatelessWidget {
   }
 }
 
+class _EventCheckInRow extends StatelessWidget {
+  const _EventCheckInRow({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 66,
+          child: Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: Colors.white54,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: emphasize
+                ? theme.textTheme.titleMedium?.copyWith(
+                    color: AppColors.offWhite,
+                    fontWeight: FontWeight.w700,
+                  )
+                : theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.offWhite,
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SuccessOverlay extends StatelessWidget {
   const _SuccessOverlay({
     required this.message,
+    required this.result,
     required this.scale,
     required this.fade,
     required this.onReady,
   });
 
   final String message;
+  final StaffDoorScanResult? result;
   final Animation<double> scale;
   final Animation<double> fade;
   final VoidCallback onReady;
 
   @override
   Widget build(BuildContext context) {
+    final eventCheckIn = result?.eventCheckIn;
+    final eventCheckInError = result?.eventCheckInError;
+
     return Container(
       color: Colors.black.withValues(alpha: 0.88),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FadeTransition(
-              opacity: fade,
-              child: ScaleTransition(
-                scale: scale,
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.successGreen.withValues(alpha: 0.2),
-                    border: Border.all(color: AppColors.successGreen, width: 3),
-                  ),
-                  child: const Icon(Icons.check, color: AppColors.successGreen, size: 48),
-                ),
-              ),
+      // Stays centred when it fits, scrolls when a long event title or a
+      // check-in error pushes it past the viewport on small staff phones.
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: math.max(0, constraints.maxHeight - 48),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'SCAN SUCCESSFUL',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FadeTransition(
+                  opacity: fade,
+                  child: ScaleTransition(
+                    scale: scale,
+                    child: Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.successGreen.withValues(alpha: 0.2),
+                        border: Border.all(
+                          color: AppColors.successGreen,
+                          width: 3,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        color: AppColors.successGreen,
+                        size: 48,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'SCAN SUCCESSFUL',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: AppColors.successGreen,
                     letterSpacing: 2,
                   ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                if (eventCheckIn != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldBright.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.goldBright.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'INVITED TO THIS EVENT',
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: AppColors.goldBright,
+                                letterSpacing: 1.4,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        _EventCheckInRow(
+                          label: 'EVENT',
+                          value: eventCheckIn.eventTitle,
+                          emphasize: true,
+                        ),
+                        const SizedBox(height: 6),
+                        _EventCheckInRow(
+                          label: 'PARTY',
+                          value: eventCheckIn.partyLabel,
+                        ),
+                        const SizedBox(height: 6),
+                        _EventCheckInRow(
+                          label: 'BRANCH',
+                          value:
+                              eventCheckIn.eventBranch?.trim().isNotEmpty ==
+                                  true
+                              ? eventCheckIn.eventBranch!
+                              : (eventCheckIn.sessionBranch ?? '—'),
+                        ),
+                        const SizedBox(height: 6),
+                        _EventCheckInRow(
+                          label: 'GUEST',
+                          value: eventCheckIn.guestName,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Guest phone will show the party welcome.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (eventCheckInError != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.dangerRed.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.dangerRed.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'EVENT CHECK-IN FAILED',
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: AppColors.dangerRed,
+                                letterSpacing: 1.4,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          eventCheckInError,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Entry is confirmed. Resolve the guest list in admin so the guest gets their welcome.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 28),
+                TigerButton(
+                  label: 'CONFIRM — SCAN NEXT GUEST',
+                  icon: Icons.qr_code_scanner,
+                  onPressed: onReady,
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 28),
-            TigerButton(
-              label: 'CONFIRM — SCAN NEXT GUEST',
-              icon: Icons.qr_code_scanner,
-              onPressed: onReady,
-            ),
-          ],
+          ),
         ),
       ),
     );

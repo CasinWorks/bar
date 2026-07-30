@@ -21,7 +21,11 @@ class TimeDepletedOverlay extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-              const Icon(Icons.hourglass_disabled, color: AppColors.tigerOrange, size: 56),
+              const Icon(
+                Icons.hourglass_disabled,
+                color: AppColors.tigerOrange,
+                size: 56,
+              ),
               const SizedBox(height: 16),
               Text(
                 'SOCIALITE PASS REQUIRED',
@@ -38,25 +42,27 @@ class TimeDepletedOverlay extends StatelessWidget {
               Text(
                 'Time is currency. It never expires — only spends down.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.goldBright,
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  color: AppColors.goldBright,
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                ),
                 textAlign: TextAlign.center,
               ),
               const Spacer(),
               Text(
                 'SEE THE HOUSE FOR MORE TIME',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.goldBright,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  color: AppColors.goldBright,
+                  fontWeight: FontWeight.w900,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Time loads are done at the club — not in the app.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 10),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),

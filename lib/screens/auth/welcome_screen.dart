@@ -5,10 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/lattice_background.dart';
+import '../../providers/app_state.dart';
 import '../../services/tiger_sound_service.dart';
 
 const _kWelcomeSeenKey = 'welcome_intro_seen_v2';
@@ -146,6 +149,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final bootstrapping = context.watch<AppState>().isLoading;
+    if (bootstrapping) {
+      return const Scaffold(
+        backgroundColor: AppColors.darkBackground,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.goldBrushed),
+        ),
+      );
+    }
+
     final h = MediaQuery.sizeOf(context).height;
     final topPad = MediaQuery.paddingOf(context).top;
     final bottomPad = MediaQuery.paddingOf(context).bottom;
@@ -193,62 +206,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               },
             ),
 
-            Positioned(
-              top: topPad + 10,
-              left: 20,
-              right: 20,
-              child: Row(
-                children: [
-                  const _TigerMark(size: 30),
-                  const SizedBox(width: 10),
-                  Text(
-                    'BLIND TIGER',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 3.2,
-                      color: AppColors.goldBright,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (!onFinale)
-                    GestureDetector(
-                      onTap: _skipToAccess,
-                      child: Text(
-                        'SKIP',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.8,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    )
-                  else if (_seenBefore)
-                    GestureDetector(
-                      onTap: _replay,
-                      child: Text(
-                        'REPLAY',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.8,
-                          color: AppColors.goldBrushed,
-                        ),
-                      ),
-                    )
-                  else
-                    Text(
-                      '${(_page + 1).toString().padLeft(2, '0')} / 0$_pageCount',
-                      style: GoogleFonts.shareTechMono(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
             PageView(
               controller: _pageController,
               scrollDirection: Axis.vertical,
@@ -289,6 +246,76 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
 
             Positioned(
+              top: topPad + 10,
+              left: 20,
+              right: 20,
+              child: Row(
+                children: [
+                  const AppLogo(size: 30),
+                  const SizedBox(width: 10),
+                  Text(
+                    'BLIND TIGER',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 3.2,
+                      color: AppColors.goldBright,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (!onFinale)
+                    GestureDetector(
+                      onTap: _skipToAccess,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          'SKIP',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.8,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_seenBefore)
+                    GestureDetector(
+                      onTap: _replay,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          'REPLAY',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.8,
+                            color: AppColors.goldBrushed,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Text(
+                      '${(_page + 1).toString().padLeft(2, '0')} / 0$_pageCount',
+                      style: GoogleFonts.shareTechMono(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            Positioned(
               left: 20,
               right: 20,
               bottom: bottomPad + 14,
@@ -324,7 +351,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             ),
                             Icon(
                               Icons.keyboard_arrow_up_rounded,
-                              color: AppColors.goldBrushed.withValues(alpha: 0.85),
+                              color: AppColors.goldBrushed.withValues(
+                                alpha: 0.85,
+                              ),
                               size: 22,
                             ),
                           ],
@@ -495,25 +524,22 @@ class _HeroScene extends StatelessWidget {
                               ],
                             ),
                             border: Border.all(
-                              color: AppColors.goldBright.withValues(alpha: 0.65),
+                              color: AppColors.goldBright.withValues(
+                                alpha: 0.65,
+                              ),
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.goldBrushed.withValues(alpha: glow * 0.6),
+                                color: AppColors.goldBrushed.withValues(
+                                  alpha: glow * 0.6,
+                                ),
                                 blurRadius: 48,
                                 spreadRadius: 4,
                               ),
                             ],
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            '虎',
-                            style: GoogleFonts.cinzel(
-                              fontSize: 84,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.goldBright,
-                            ),
-                          ),
+                          child: const AppLogo(size: 148),
                         ),
                         // Claw stroke wipe over the emblem
                         Positioned.fill(
@@ -528,11 +554,7 @@ class _HeroScene extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            _in(
-              t: _stagger(t, 0.55, 0.4),
-              dy: 20,
-              child: const _WalletStrip(),
-            ),
+            _in(t: _stagger(t, 0.55, 0.4), dy: 20, child: const _WalletStrip()),
           ],
         );
       },
@@ -618,7 +640,10 @@ class _WalletStrip extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AppColors.timerNeon,
-              shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.85),
+              shadows: AppColors.timerGlow(
+                AppColors.timerNeon,
+                intensity: 0.85,
+              ),
             ),
           ),
           const Spacer(),
@@ -945,8 +970,9 @@ class _HowCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                crossFadeState:
-                    expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                crossFadeState: expanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
                 duration: const Duration(milliseconds: 280),
               ),
             ],
@@ -1044,15 +1070,16 @@ class _LoopScene extends StatelessWidget {
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: AppColors.goldBrushed.withValues(
-                                            alpha: 0.55,
-                                          ),
+                                          color: AppColors.goldBrushed
+                                              .withValues(alpha: 0.55),
                                         ),
                                         color: AppColors.cardSurface,
                                         boxShadow: [
                                           BoxShadow(
                                             color: AppColors.goldBrushed
-                                                .withValues(alpha: 0.2 * stepReveal),
+                                                .withValues(
+                                                  alpha: 0.2 * stepReveal,
+                                                ),
                                             blurRadius: 12,
                                           ),
                                         ],
@@ -1076,7 +1103,9 @@ class _LoopScene extends StatelessWidget {
                                         ),
                                         alignment: Alignment.centerLeft,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                           border: Border.all(
                                             color: AppColors.cardBorder,
                                           ),
@@ -1099,7 +1128,9 @@ class _LoopScene extends StatelessWidget {
                                                 sub,
                                                 style: GoogleFonts.inter(
                                                   fontSize: 13,
-                                                  color: const Color(0xFFC4B8A8),
+                                                  color: const Color(
+                                                    0xFFC4B8A8,
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -1152,7 +1183,11 @@ class _GoldLinePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
 
-    canvas.drawLine(Offset(size.width / 2, 0), Offset(size.width / 2, size.height), track);
+    canvas.drawLine(
+      Offset(size.width / 2, 0),
+      Offset(size.width / 2, size.height),
+      track,
+    );
     if (progress > 0) {
       canvas.drawLine(
         Offset(size.width / 2, 0),
@@ -1372,13 +1407,19 @@ class _PillButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             gradient: filled
                 ? const LinearGradient(
-                    colors: [Color(0xFFE5C180), Color(0xFFC5A059), Color(0xFF8E6E35)],
+                    colors: [
+                      Color(0xFFE5C180),
+                      Color(0xFFC5A059),
+                      Color(0xFF8E6E35),
+                    ],
                   )
                 : null,
             color: filled ? null : const Color(0xE6080400),
             border: filled
                 ? null
-                : Border.all(color: AppColors.goldBrushed.withValues(alpha: 0.45)),
+                : Border.all(
+                    color: AppColors.goldBrushed.withValues(alpha: 0.45),
+                  ),
           ),
           child: Center(
             child: Text(
@@ -1391,34 +1432,6 @@ class _PillButton extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TigerMark extends StatelessWidget {
-  const _TigerMark({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.goldBrushed),
-        color: AppColors.goldBrushed.withValues(alpha: 0.08),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        '虎',
-        style: GoogleFonts.cinzel(
-          fontSize: size * 0.48,
-          color: AppColors.goldBright,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -1439,9 +1452,7 @@ class _GlowOrb extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withValues(alpha: 0)],
-          ),
+          gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
         ),
       ),
     );

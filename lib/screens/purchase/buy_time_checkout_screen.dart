@@ -87,7 +87,9 @@ class _BuyTimeCheckoutScreenState extends State<BuyTimeCheckoutScreen> {
               const SizedBox(height: 4),
               Text(
                 '${state.selectedTimeMinutes}m • ${state.paymentMethod.label}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontSize: 10),
               ),
             ],
           ),

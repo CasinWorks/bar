@@ -29,7 +29,9 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
     final state = context.watch<AppState>();
     final inClub = state.sessionPhase == SessionPhase.insideClub;
     final selectedMinutes = state.selectedTimeMinutes;
-    final selectedPrice = AppTimePricing.discountedPriceForMinutes(selectedMinutes);
+    final selectedPrice = AppTimePricing.discountedPriceForMinutes(
+      selectedMinutes,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -48,7 +50,9 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
               children: [
                 Text(
                   'BUY CLUB TIME',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 20),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineLarge?.copyWith(fontSize: 20),
                 ),
                 Text(
                   inClub
@@ -61,7 +65,9 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
                 const SizedBox(height: 16),
                 Text(
                   'SELECT PACKAGE',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontSize: 9),
                 ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -84,7 +90,9 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'CUSTOM AMOUNT',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelLarge?.copyWith(fontSize: 9),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -112,12 +120,14 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Total:', style: Theme.of(context).textTheme.bodyMedium),
+                          Text(
+                            'Total:',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
                           Text(
                             '₱$selectedPrice • ${selectedMinutes}m',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: AppColors.goldBright,
-                                ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: AppColors.goldBright),
                           ),
                         ],
                       ),
@@ -125,9 +135,9 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
                       Text(
                         'PAYMENT METHOD',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontSize: 8,
-                              letterSpacing: 1,
-                            ),
+                          fontSize: 8,
+                          letterSpacing: 1,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -135,11 +145,15 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
                           final selected = state.paymentMethod == method;
                           return Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
                               child: GestureDetector(
                                 onTap: () => state.setPaymentMethod(method),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
@@ -157,7 +171,9 @@ class _BuyTimeScreenState extends State<BuyTimeScreen> {
                                     style: TextStyle(
                                       fontSize: 8,
                                       fontWeight: FontWeight.bold,
-                                      color: selected ? AppColors.goldBright : AppColors.neutral400,
+                                      color: selected
+                                          ? AppColors.goldBright
+                                          : AppColors.neutral400,
                                     ),
                                   ),
                                 ),
@@ -209,35 +225,43 @@ class _BalanceCard extends StatelessWidget {
             Text(
               'ACTIVE PASS: ${state.formatDuration(state.timeRemaining)}',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.timerNeon,
-                    fontWeight: FontWeight.w900,
-                    shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.55),
-                  ),
+                color: AppColors.timerNeon,
+                fontWeight: FontWeight.w900,
+                shadows: AppColors.timerGlow(
+                  AppColors.timerNeon,
+                  intensity: 0.55,
+                ),
+              ),
             ),
             if (state.timeBalance > 0) ...[
               const SizedBox(height: 4),
               Text(
                 'Saved wallet: ${state.formatDuration(state.timeBalance)}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 10,
-                      color: AppColors.timerNeonGlow,
-                    ),
+                  fontSize: 10,
+                  color: AppColors.timerNeonGlow,
+                ),
               ),
             ],
           ] else ...[
             Text(
               'SAVED TIME: ${state.formatDuration(state.timeBalance)}',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.timerNeon,
-                    fontWeight: FontWeight.w900,
-                    shadows: AppColors.timerGlow(AppColors.timerNeon, intensity: 0.55),
-                  ),
+                color: AppColors.timerNeon,
+                fontWeight: FontWeight.w900,
+                shadows: AppColors.timerGlow(
+                  AppColors.timerNeon,
+                  intensity: 0.55,
+                ),
+              ),
             ),
           ],
           const SizedBox(height: 4),
           Text(
             'Time never expires — it stays on your account until you spend it.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontSize: 10),
           ),
         ],
       ),
@@ -272,10 +296,16 @@ class _PackageCard extends StatelessWidget {
                   if (package.popular)
                     Container(
                       margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [AppColors.tigerOrange, AppColors.goldBrushed],
+                          colors: [
+                            AppColors.tigerOrange,
+                            AppColors.goldBrushed,
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -298,7 +328,9 @@ class _PackageCard extends StatelessWidget {
                   ),
                   Text(
                     package.tagline,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 9),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(fontSize: 9),
                   ),
                 ],
               ),
@@ -309,20 +341,22 @@ class _PackageCard extends StatelessWidget {
                 Text(
                   '₱${package.price}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        decoration: TextDecoration.lineThrough,
-                        fontSize: 10,
-                      ),
+                    decoration: TextDecoration.lineThrough,
+                    fontSize: 10,
+                  ),
                 ),
                 Text(
                   '₱${package.discountedPrice}',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.goldBright,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    color: AppColors.goldBright,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 Icon(
                   selected ? Icons.check_circle : Icons.circle_outlined,
-                  color: selected ? AppColors.goldBrushed : AppColors.neutral500,
+                  color: selected
+                      ? AppColors.goldBrushed
+                      : AppColors.neutral500,
                   size: 16,
                 ),
               ],

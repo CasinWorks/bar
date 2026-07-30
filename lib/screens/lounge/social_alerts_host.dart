@@ -7,11 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../models/event_guest_checkin_alert.dart';
 import '../../models/social_play.dart';
 import '../../models/time_low_alert.dart';
 import '../../providers/app_state.dart';
 import '../../router/app_router.dart';
-import 'friend_chat_sheet.dart';
 import 'friend_requests_sheet.dart';
 
 /// App-wide overlays — private alerts as a compact top banner (island / pill).
@@ -30,6 +30,7 @@ class _SocialAlertsHostState extends State<SocialAlertsHost>
     with SingleTickerProviderStateMixin {
   String? _showingRequestId;
   String? _showingPingId;
+  String? _showingGuestCheckinId;
   String? _showingTimeLowId;
   _BannerPayload? _banner;
   bool _dismissing = false;
@@ -79,15 +80,16 @@ class _SocialAlertsHostState extends State<SocialAlertsHost>
                     child: Align(
                       alignment: Alignment.topCenter,
                       child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, -1.15),
-                          end: Offset.zero,
-                        ).animate(
-                          CurvedAnimation(
-                            parent: _enter,
-                            curve: Curves.easeOutCubic,
-                          ),
-                        ),
+                        position:
+                            Tween<Offset>(
+                              begin: const Offset(0, -1.15),
+                              end: Offset.zero,
+                            ).animate(
+                              CurvedAnimation(
+                                parent: _enter,
+                                curve: Curves.easeOutCubic,
+                              ),
+                            ),
                         child: FadeTransition(
                           opacity: _enter,
                           child: _IslandBanner(
@@ -124,6 +126,12 @@ class _SocialAlertsHostState extends State<SocialAlertsHost>
     final ping = app.pendingPingAlert;
     if (ping != null && ping.id != _showingPingId) {
       _presentPing(app, ping);
+      return;
+    }
+
+    final guestCheckin = app.pendingEventGuestCheckinAlert;
+    if (guestCheckin != null && guestCheckin.id != _showingGuestCheckinId) {
+      _presentGuestCheckin(app, guestCheckin);
       return;
     }
 
@@ -166,6 +174,17 @@ class _SocialAlertsHostState extends State<SocialAlertsHost>
     _armAutoDismiss(app, duration: _timerAutoDismissDuration);
   }
 
+  void _presentGuestCheckin(AppState app, EventGuestCheckinAlert alert) {
+    HapticFeedback.mediumImpact();
+    _dismissing = false;
+    _showingGuestCheckinId = alert.id;
+    setState(() {
+      _banner = _BannerPayload.guestCheckin(alert);
+    });
+    _enter.forward(from: 0);
+    _armAutoDismiss(app);
+  }
+
   void _armAutoDismiss(
     AppState app, {
     Duration duration = _autoDismissDuration,
@@ -193,14 +212,19 @@ class _SocialAlertsHostState extends State<SocialAlertsHost>
     final ping = payload.ping;
     if (ping != null) {
       final name = ping.senderName ?? 'Friend';
-      FriendChatSheet.show(
-        navContext,
-        FriendProfile(memberId: ping.senderId, displayName: name),
-      );
+      final profile = FriendProfile(memberId: ping.senderId, displayName: name);
+      app.openChatsTab(thread: profile);
+      if (GoRouter.of(navContext).state.matchedLocation != '/lounge') {
+        GoRouter.of(navContext).go('/lounge');
+      }
       return;
     }
     if (payload.timeLow != null) {
       GoRouter.of(navContext).go('/pricing');
+      return;
+    }
+    if (payload.guestCheckin != null) {
+      GoRouter.of(navContext).go('/lounge');
     }
   }
 
@@ -240,6 +264,11 @@ class _SocialAlertsHostState extends State<SocialAlertsHost>
       if (_showingTimeLowId == payload.timeLow!.id) {
         _showingTimeLowId = null;
       }
+    } else if (payload.guestCheckin != null) {
+      unawaited(app.acknowledgeEventGuestCheckinAlert(payload.guestCheckin!));
+      if (_showingGuestCheckinId == payload.guestCheckin!.id) {
+        _showingGuestCheckinId = null;
+      }
     }
 
     _dismissing = false;
@@ -262,6 +291,7 @@ class _BannerPayload {
     required this.accent,
     this.request,
     this.ping,
+    this.guestCheckin,
     this.timeLow,
   });
 
@@ -284,17 +314,28 @@ class _BannerPayload {
       eyebrow: isChat
           ? 'MESSAGE'
           : isHelp
-              ? 'NEED HELP'
-              : 'PING',
+          ? 'NEED HELP'
+          : 'PING',
       title: name,
       body: ping.message,
       icon: isHelp
           ? Icons.sos_rounded
           : isChat
-              ? Icons.chat_bubble_rounded
-              : Icons.campaign_rounded,
+          ? Icons.chat_bubble_rounded
+          : Icons.campaign_rounded,
       accent: isHelp ? AppColors.dangerRed : AppColors.tigerRed,
       ping: ping,
+    );
+  }
+
+  factory _BannerPayload.guestCheckin(EventGuestCheckinAlert alert) {
+    return _BannerPayload._(
+      eyebrow: alert.eyebrow,
+      title: alert.title,
+      body: alert.body,
+      icon: Icons.celebration_rounded,
+      accent: AppColors.goldBright,
+      guestCheckin: alert,
     );
   }
 
@@ -316,6 +357,7 @@ class _BannerPayload {
   final Color accent;
   final FriendRequest? request;
   final FriendPing? ping;
+  final EventGuestCheckinAlert? guestCheckin;
   final TimeLowAlert? timeLow;
 }
 
@@ -335,7 +377,7 @@ class _IslandBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dismissible(
       key: ValueKey(
-        'social-banner-${payload.request?.id ?? payload.ping?.id ?? payload.timeLow?.id}',
+        'social-banner-${payload.request?.id ?? payload.ping?.id ?? payload.guestCheckin?.id ?? payload.timeLow?.id}',
       ),
       direction: DismissDirection.up,
       onDismissed: (_) => onSwipeDismiss(),
