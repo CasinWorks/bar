@@ -201,8 +201,10 @@ export default function GuestsPage() {
             Add to guest list
           </button>
           <p className="page-sub" style={{ marginBottom: 0 }}>
-            The email is how the guest gets linked to their app account. Without a match the
-            guest is door-list only and the event stays invisible in their app.
+            Email must match their app account. If the account already exists we
+            link it immediately; if they sign up later with the same email, the
+            guest list peers automatically so the event appears in-app and at
+            the door.
           </p>
         </form>
       </div>

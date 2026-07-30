@@ -5,7 +5,7 @@ import { requireAdmin } from '../middleware/auth.js';
 const router = Router();
 
 const UNLINKED_WARNING =
-  'No app account matches this email, so member_id is empty. The guest will NOT see this event in the mobile app until an account with that email exists and the guest is re-linked.';
+  'No app account matches this email yet, so member_id is empty. The guest is door-list only until they register (or you re-link) with this exact email — then the event peers to their account automatically.';
 
 function normalizeEmail(value) {
   const trimmed = String(value ?? '').trim().toLowerCase();
@@ -19,15 +19,33 @@ async function resolveMemberIdByEmail(email) {
   const normalized = normalizeEmail(email);
   if (!normalized) return null;
 
+  // Escape ILIKE wildcards so "a_b@x.com" does not match "axb@x.com".
+  const escaped = normalized.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('id, email')
-    .ilike('email', normalized)
-    .limit(2);
+    .ilike('email', escaped)
+    .limit(5);
 
   if (error) throw error;
-  if (!data || data.length !== 1) return null;
-  return data[0].id;
+  const matches = (data || []).filter((row) => normalizeEmail(row.email) === normalized);
+  if (matches.length !== 1) return null;
+  return matches[0].id;
+}
+
+/// After member_id is set, ask Postgres to mirror guest_list → event_guests
+/// and peer any other pending invite rows for that account.
+async function peerLinkedMember(memberId) {
+  if (!memberId) return;
+  const { error } = await supabaseAdmin.rpc('link_event_guest_rows_for_member', {
+    p_member_id: memberId,
+  });
+  // Older DBs without migration 036 still get member_id on guest_list_entries;
+  // the 028 trigger (if present) mirrors from there. Don't fail the admin write.
+  if (error && !/function .*link_event_guest_rows_for_member/i.test(error.message || '')) {
+    throw error;
+  }
 }
 
 async function memberAlreadyOnList(eventId, memberId, excludeEntryId = null) {
@@ -88,7 +106,7 @@ router.post('/', requireAdmin, async (req, res) => {
     .insert({
       event_id: eventId,
       name,
-      email: email || null,
+      email: normalizeEmail(email) || email || null,
       phone: phone || null,
       plus_ones: Number(plusOnes) || 0,
       member_id: resolvedMemberId,
@@ -100,6 +118,13 @@ router.post('/', requireAdmin, async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  try {
+    await peerLinkedMember(resolvedMemberId);
+  } catch (e) {
+    return res.status(500).json({ error: e.message, guest: data, warning });
+  }
+
   res.json({ guest: data, warning });
 });
 
@@ -118,19 +143,27 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (currentError) return res.status(404).json({ error: currentError.message });
 
   let warning = null;
+  let resolvedMemberId = null;
   try {
     // Re-resolve whenever the guest is still unlinked, or the email changed.
     const emailChanged =
       patch.email !== undefined && normalizeEmail(patch.email) !== normalizeEmail(current.email);
+    if (patch.email !== undefined) {
+      patch.email = normalizeEmail(patch.email) || patch.email || null;
+    }
     if (patch.member_id === undefined && (!current.member_id || emailChanged)) {
       const resolved = await resolveMemberIdByEmail(patch.email ?? current.email);
       if (resolved && !(await memberAlreadyOnList(current.event_id, resolved, current.id))) {
         patch.member_id = resolved;
+        resolvedMemberId = resolved;
       }
+    } else if (patch.member_id) {
+      resolvedMemberId = patch.member_id;
     }
     const nextMemberId =
       patch.member_id !== undefined ? patch.member_id : current.member_id;
     if (!nextMemberId) warning = UNLINKED_WARNING;
+    else resolvedMemberId = nextMemberId;
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
@@ -143,6 +176,13 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  try {
+    await peerLinkedMember(resolvedMemberId || data?.member_id);
+  } catch (e) {
+    return res.status(500).json({ error: e.message, guest: data, warning });
+  }
+
   res.json({ guest: data, warning });
 });
 
