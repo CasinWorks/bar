@@ -51,11 +51,24 @@ export default function TimeLoadPage() {
   const [bonusRule, setBonusRule] = useState('birthday');
   const [bonusMinutes, setBonusMinutes] = useState('');
   const [bonusRecipient, setBonusRecipient] = useState('');
+  const [loadsPage, setLoadsPage] = useState(1);
+  const [loadsPageSize, setLoadsPageSize] = useState(10);
 
   const preview = useMemo(
     () => previewLoad(selectedSlug, quantity, paymentMethod, packages),
     [selectedSlug, quantity, paymentMethod, packages],
   );
+
+  const loadsTotalPages = Math.max(1, Math.ceil(loads.length / loadsPageSize));
+  const loadsPageSafe = Math.min(loadsPage, loadsTotalPages);
+  const pagedLoads = useMemo(() => {
+    const start = (loadsPageSafe - 1) * loadsPageSize;
+    return loads.slice(start, start + loadsPageSize);
+  }, [loads, loadsPageSafe, loadsPageSize]);
+
+  useEffect(() => {
+    if (loadsPage !== loadsPageSafe) setLoadsPage(loadsPageSafe);
+  }, [loadsPage, loadsPageSafe]);
 
   async function refresh() {
     const [u, l, p] = await Promise.all([
@@ -67,6 +80,7 @@ export default function TimeLoadPage() {
     ]);
     setAccounts(u.users);
     setLoads(l.loads);
+    setLoadsPage(1);
     const nextPackages = (p.packages ?? []).map(toDeskPackage).filter(Boolean);
     if (nextPackages.length) {
       setPackages(nextPackages);
@@ -316,7 +330,23 @@ export default function TimeLoadPage() {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Recent loads</h3>
+        <div className="table-toolbar">
+          <h3 style={{ margin: 0 }}>Recent loads</h3>
+          <label className="page-size-control">
+            Rows per page
+            <select
+              value={loadsPageSize}
+              onChange={(e) => {
+                setLoadsPageSize(Number(e.target.value));
+                setLoadsPage(1);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </label>
+        </div>
         <table>
           <thead>
             <tr>
@@ -330,57 +360,96 @@ export default function TimeLoadPage() {
             </tr>
           </thead>
           <tbody>
-            {loads.map((l) => {
-              const voided = l.status === 'voided';
-              return (
-              <tr key={l.id} style={voided ? { opacity: 0.55 } : undefined}>
-                <td>{formatDate(l.created_at)}</td>
-                <td>{l.recipient?.name ?? l.member?.name}</td>
-                <td>{l.package_slug ?? '—'}</td>
-                <td>
-                  {formatDuration(l.seconds_loaded)}
-                  {l.drinks_granted != null && (
-                    <span style={{ color: 'var(--muted)', fontSize: 11 }}> · {l.drinks_granted} drinks</span>
-                  )}
-                  {voided && <span className="badge badge-red" style={{ marginLeft: 6 }}>VOIDED</span>}
-                </td>
-                <td>
-                  {l.payment_method === 'complimentary'
-                    ? 'Comp'
-                    : formatPeso(l.amount_peso)}
-                </td>
-                <td>{voided ? l.voider?.name : l.loader?.name}</td>
-                <td>
-                  {!voided && (
-                    voidingId === l.id ? (
-                      <div style={{ minWidth: 200 }}>
-                        <input
-                          value={voidReason}
-                          onChange={(e) => setVoidReason(e.target.value)}
-                          placeholder="Reason for void…"
-                          style={{ marginBottom: 6 }}
-                        />
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => handleVoid(l)}>
-                            Confirm void
-                          </button>
-                          <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setVoidingId(null); setVoidReason(''); }}>
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setVoidingId(l.id); setVoidReason(''); setErr(''); }}>
-                        Void
-                      </button>
-                    )
-                  )}
+            {pagedLoads.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ color: 'var(--muted)' }}>
+                  No loads yet.
                 </td>
               </tr>
-            );
-            })}
+            ) : (
+              pagedLoads.map((l) => {
+                const voided = l.status === 'voided';
+                return (
+                <tr key={l.id} style={voided ? { opacity: 0.55 } : undefined}>
+                  <td>{formatDate(l.created_at)}</td>
+                  <td>{l.recipient?.name ?? l.member?.name}</td>
+                  <td>{l.package_slug ?? '—'}</td>
+                  <td>
+                    {formatDuration(l.seconds_loaded)}
+                    {l.drinks_granted != null && (
+                      <span style={{ color: 'var(--muted)', fontSize: 11 }}> · {l.drinks_granted} drinks</span>
+                    )}
+                    {voided && <span className="badge badge-red" style={{ marginLeft: 6 }}>VOIDED</span>}
+                  </td>
+                  <td>
+                    {l.payment_method === 'complimentary'
+                      ? 'Comp'
+                      : formatPeso(l.amount_peso)}
+                  </td>
+                  <td>{voided ? l.voider?.name : l.loader?.name}</td>
+                  <td>
+                    {!voided && (
+                      voidingId === l.id ? (
+                        <div style={{ minWidth: 200 }}>
+                          <input
+                            value={voidReason}
+                            onChange={(e) => setVoidReason(e.target.value)}
+                            placeholder="Reason for void…"
+                            style={{ marginBottom: 6 }}
+                          />
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => handleVoid(l)}>
+                              Confirm void
+                            </button>
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setVoidingId(null); setVoidReason(''); }}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setVoidingId(l.id); setVoidReason(''); setErr(''); }}>
+                          Void
+                        </button>
+                      )
+                    )}
+                  </td>
+                </tr>
+              );
+              })
+            )}
           </tbody>
         </table>
+        <div className="table-pagination">
+          <span>
+            {loads.length === 0
+              ? '0 loads'
+              : `Showing ${(loadsPageSafe - 1) * loadsPageSize + 1}–${Math.min(
+                  loadsPageSafe * loadsPageSize,
+                  loads.length,
+                )} of ${loads.length}`}
+          </span>
+          <div className="table-pagination-actions">
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              disabled={loadsPageSafe <= 1}
+              onClick={() => setLoadsPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </button>
+            <span>
+              Page {loadsPageSafe} of {loadsTotalPages}
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              disabled={loadsPageSafe >= loadsTotalPages}
+              onClick={() => setLoadsPage((p) => Math.min(loadsTotalPages, p + 1))}
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
     </>
   );

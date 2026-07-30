@@ -544,32 +544,38 @@ export default function EventsPage() {
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             required
           />
-          <label>Starts at</label>
-          <EventDateTimePicker
-            value={form.startsAt}
-            timeLabel="Start time"
-            allowPast={Boolean(editingId)}
-            busyDates={busyDates}
-            onChange={(startsAt) =>
-              setForm((f) => {
-                const next = { ...f, startsAt };
-                if (!f.endsAt || (startsAt && new Date(f.endsAt) <= new Date(startsAt))) {
-                  next.endsAt = defaultEndsAt(startsAt);
+          <div className="event-window-grid">
+            <div className="event-window-field">
+              <label>Starts at</label>
+              <EventDateTimePicker
+                value={form.startsAt}
+                timeLabel="Start time"
+                allowPast={Boolean(editingId)}
+                busyDates={busyDates}
+                onChange={(startsAt) =>
+                  setForm((f) => {
+                    const next = { ...f, startsAt };
+                    if (!f.endsAt || (startsAt && new Date(f.endsAt) <= new Date(startsAt))) {
+                      next.endsAt = defaultEndsAt(startsAt);
+                    }
+                    return next;
+                  })
                 }
-                return next;
-              })
-            }
-            required
-          />
-          <label>Ends at</label>
-          <EventDateTimePicker
-            value={form.endsAt}
-            timeLabel="End time"
-            allowPast={Boolean(editingId)}
-            busyDates={busyDates}
-            onChange={(endsAt) => setForm((f) => ({ ...f, endsAt }))}
-            required
-          />
+                required
+              />
+            </div>
+            <div className="event-window-field">
+              <label>Ends at</label>
+              <EventDateTimePicker
+                value={form.endsAt}
+                timeLabel="End time"
+                allowPast={Boolean(editingId)}
+                busyDates={busyDates}
+                onChange={(endsAt) => setForm((f) => ({ ...f, endsAt }))}
+                required
+              />
+            </div>
+          </div>
           {!windowValid && form.startsAt && form.endsAt && (
             <p className="error" style={{ marginTop: 8 }}>
               End time must be after start time.

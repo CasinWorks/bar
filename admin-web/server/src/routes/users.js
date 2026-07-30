@@ -97,6 +97,46 @@ router.patch('/:id', requireAdmin, requireAdminOnly, async (req, res) => {
   res.json({ user: data });
 });
 
+function randomTempPassword() {
+  const chunk = Math.random().toString(36).slice(2, 8);
+  return `Tiger-${chunk}!9`;
+}
+
+/** Admin sets a temporary password so the member can sign in again. */
+router.post('/:id/reset-password', requireAdmin, requireAdminOnly, async (req, res) => {
+  const { id } = req.params;
+
+  const { data: existing, error: lookupError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, name, role')
+    .eq('id', id)
+    .single();
+
+  if (lookupError || !existing) {
+    return res.status(404).json({ error: 'Member not found.' });
+  }
+  if (isSuperAdminEmail(existing.email)) {
+    return res.status(403).json({ error: 'This account is protected and cannot be modified.' });
+  }
+
+  const requested = typeof req.body?.password === 'string' ? req.body.password.trim() : '';
+  const tempPassword = requested.length >= 8 ? requested : randomTempPassword();
+
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+    password: tempPassword,
+  });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.json({
+    ok: true,
+    userId: id,
+    email: existing.email,
+    name: existing.name,
+    tempPassword,
+  });
+});
+
 router.get('/:id/sessions', requireAdmin, async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('club_sessions')
