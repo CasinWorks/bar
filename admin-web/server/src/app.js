@@ -11,6 +11,7 @@ import safetySocialRoutes from './routes/safetySocial.js';
 import branchesRoutes from './routes/branches.js';
 import packagesRoutes from './routes/packages.js';
 import pushRoutes from './routes/push.js';
+import downloadRoutes from './routes/download.js';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/safety-social', safetySocialRoutes);
 app.use('/api/branches', branchesRoutes);
 app.use('/api/packages', packagesRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/download', downloadRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

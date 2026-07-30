@@ -68,8 +68,8 @@ const MODULES = [
     name: 'Mobile App',
     purpose: 'Remaining time, rewards, and account',
     status: 'live',
-    href: '/app/users',
-    action: 'Members',
+    href: '/app/download-invites',
+    action: 'Download invites',
   },
 ];
 

@@ -43,6 +43,10 @@ export const supabaseAdmin = {
     ensureClients();
     return cachedAdmin.auth;
   },
+  get storage() {
+    ensureClients();
+    return cachedAdmin.storage;
+  },
   rpc(...args) {
     ensureClients();
     return cachedAdmin.rpc(...args);

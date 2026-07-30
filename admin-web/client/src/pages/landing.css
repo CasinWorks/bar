@@ -119,7 +119,8 @@
   gap: 28px;
 }
 
-.lp-nav-links a {
+.lp-nav-links a,
+.lp-nav-links a:visited {
   color: var(--lp-muted);
   text-decoration: none;
   font-size: 11px;

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import AppLoader from './components/AppLoader';
 import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
+import DownloadPage from './pages/DownloadPage';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import PlatformPage from './pages/PlatformPage';
@@ -14,6 +15,7 @@ import GuestsPage from './pages/GuestsPage';
 import HrPage from './pages/HrPage';
 import SafetySocialPage from './pages/SafetySocialPage';
 import BranchesPage from './pages/BranchesPage';
+import DownloadInvitesPage from './pages/DownloadInvitesPage';
 
 function Protected({ children }) {
   const { session, profile, loading, accessError, signOut } = useAuth();
@@ -41,6 +43,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/download" element={<DownloadPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
             path="/app"
@@ -58,6 +61,7 @@ export default function App() {
             <Route path="events" element={<EventsPage />} />
             <Route path="guests" element={<GuestsPage />} />
             <Route path="branches" element={<BranchesPage />} />
+            <Route path="download-invites" element={<DownloadInvitesPage />} />
             <Route path="safety-social" element={<SafetySocialPage />} />
             <Route path="hr" element={<HrPage />} />
           </Route>

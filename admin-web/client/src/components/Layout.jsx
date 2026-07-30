@@ -11,6 +11,7 @@ const links = [
   { to: '/app/events', label: 'Calendar & Events' },
   { to: '/app/guests', label: 'Guest List' },
   { to: '/app/branches', label: 'Branches' },
+  { to: '/app/download-invites', label: 'App Downloads' },
   { to: '/app/safety-social', label: 'Safety & Social' },
   { to: '/app/hr', label: 'HR & Employment' },
 ];

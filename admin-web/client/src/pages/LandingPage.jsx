@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
@@ -412,6 +413,9 @@ export default function LandingPage() {
           <a href="#membership" onClick={(e) => scrollToSection(e, 'membership')}>
             MEMBERSHIP
           </a>
+          <Link to="/download" onClick={() => setMobileNavOpen(false)}>
+            DOWNLOAD
+          </Link>
         </nav>
       </header>
       <button
@@ -438,9 +442,9 @@ export default function LandingPage() {
               <a className="lp-btn lp-btn-primary" href="#packages" onClick={(e) => scrollToSection(e, 'packages')}>
                 BUY TIME
               </a>
-              <a className="lp-btn lp-btn-ghost" href="#flow" onClick={(e) => scrollToSection(e, 'flow')}>
-                HOW IT WORKS
-              </a>
+              <Link className="lp-btn lp-btn-ghost" to="/download">
+                DOWNLOAD FOR FREE
+              </Link>
             </div>
           </div>
 
@@ -703,9 +707,14 @@ export default function LandingPage() {
             Blind Tiger Club District — buy a package at the desk, scan in,
             and spend the night like time is the only currency that matters.
           </p>
-          <a className="lp-btn lp-btn-primary" href="#packages" onClick={(e) => scrollToSection(e, 'packages')}>
-            YOUR TIME STARTS NOW
-          </a>
+          <div className="lp-cta-row" style={{ justifyContent: 'center' }}>
+            <a className="lp-btn lp-btn-primary" href="#packages" onClick={(e) => scrollToSection(e, 'packages')}>
+              YOUR TIME STARTS NOW
+            </a>
+            <Link className="lp-btn lp-btn-ghost" to="/download">
+              DOWNLOAD FOR FREE
+            </Link>
+          </div>
         </div>
       </section>
 
