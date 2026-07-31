@@ -31,10 +31,10 @@ const MODULES = [
   },
   {
     name: 'Drink Tracking',
-    purpose: 'Monitors included drink allowance',
+    purpose: 'Menu inventory + package drink allowance',
     status: 'live',
-    href: '/app/time-load',
-    action: 'Packages',
+    href: '/app/drinks',
+    action: 'Inventory',
   },
   {
     name: 'Experience Access',

@@ -36,6 +36,19 @@
   text-align: center;
 }
 
+.dl-app-icon {
+  width: 112px;
+  height: 112px;
+  display: block;
+  object-fit: cover;
+  margin: 0 auto 24px;
+  border-radius: 25%;
+  border: 1px solid rgba(229, 193, 128, 0.45);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.46),
+    0 0 34px rgba(212, 37, 43, 0.2);
+}
+
 .dl-title {
   font-family: var(--lp-serif);
   font-weight: 800;

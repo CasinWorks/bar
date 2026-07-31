@@ -91,9 +91,7 @@ export default function DownloadPage() {
 
       <header className="lp-nav dl-nav">
         <Link to="/" className="lp-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <span className="lp-mark" aria-hidden>
-            虎
-          </span>
+          <img className="lp-mark" src="/app-icon.png" alt="" aria-hidden />
           <span>BLIND TIGER</span>
         </Link>
         <Link to="/" className="dl-back">
@@ -104,6 +102,7 @@ export default function DownloadPage() {
       <main className="dl-main">
         {!links ? (
           <section className="dl-gate">
+            <img className="dl-app-icon" src="/app-icon.png" alt="Blind Tiger app icon" />
             <p className="lp-eyebrow">INVITE ONLY</p>
             <h1 className="dl-title">Download for free</h1>
             <p className="dl-lede">
@@ -133,6 +132,7 @@ export default function DownloadPage() {
           </section>
         ) : (
           <section className="dl-reveal">
+            <img className="dl-app-icon" src="/app-icon.png" alt="Blind Tiger app icon" />
             <p className="lp-eyebrow">READY TO INSTALL</p>
             <h1 className="dl-title">Scan your platform</h1>
             <p className="dl-lede">

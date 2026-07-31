@@ -13,6 +13,7 @@ import '../../providers/app_state.dart';
 import '../../services/tiger_sound_service.dart';
 
 import 'bartender_bar_screen.dart';
+import 'bartender_pos_screen.dart';
 import 'bartender_tip_pad_screen.dart';
 
 enum _ScannerPhase { scanning, pending, success }
@@ -214,6 +215,17 @@ class _DoorScannerScreenState extends State<DoorScannerScreen>
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.point_of_sale),
+            tooltip: 'Bar POS',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const BartenderPosScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.local_bar),
             tooltip: 'Bar queue',

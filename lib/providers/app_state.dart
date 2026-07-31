@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../core/config/door_qr_bypass.dart' as door_qr;
 import '../core/config/super_admin.dart';
@@ -26,7 +27,11 @@ import '../services/safety_social_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/branch_service.dart';
 import '../services/club_package_service.dart';
+import '../services/drink_catalog_service.dart';
+import '../services/drink_pos_service.dart';
 import '../services/deep_link_service.dart';
+import '../models/drink_catalog.dart';
+import '../models/drink_pay_payload.dart';
 import '../models/time_gift.dart';
 import '../models/time_low_alert.dart';
 import '../models/drink_order.dart';
@@ -553,6 +558,7 @@ class AppState extends ChangeNotifier {
     await Future.wait([
       _loadBranches(),
       ClubPackageService().listActivePackages(),
+      DrinkCatalogService().listActiveDrinks(),
     ]);
     await _sessionStore.load();
     await _drinkOrders.ensureLoaded();
@@ -3333,9 +3339,8 @@ class AppState extends ChangeNotifier {
       return 0;
     }
     if (order.costSeconds > 0) return order.costSeconds;
-    for (final drink in MockData.drinks) {
-      if (drink.id == order.drinkId) return _drinkFallbackCostSeconds(drink);
-    }
+    final catalogDrink = DrinkCatalog.bySlug(order.drinkId);
+    if (catalogDrink != null) return _drinkFallbackCostSeconds(catalogDrink);
     return standardDrinkVipTabSeconds;
   }
 
@@ -3474,6 +3479,94 @@ class AppState extends ChangeNotifier {
   Future<bool> orderDrink(Drink drink, {bool payWithCash = false}) async {
     final order = await placeDrinkOrder(drink, payWithCash: payWithCash);
     return order != null;
+  }
+
+  final _drinkPos = DrinkPosService();
+
+  /// Staff POS: open a payment ticket for the cart (QR for guest scan).
+  Future<(DrinkPosTicket?, DrinkPayPayload?, String?)> staffCreateDrinkPosTicket(
+    List<DrinkPosCartLine> lines,
+  ) async {
+    if (!isStaff) return (null, null, 'Staff only.');
+    if (_user == null) return (null, null, 'Not signed in.');
+    try {
+      final ticket = await _drinkPos.createTicket(lines);
+      final payload = DrinkPayPayload(
+        ticketId: ticket.id,
+        staffId: ticket.staffId,
+        staffName: ticket.staffName,
+        timestamp: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        lineCount: ticket.lineCount,
+      );
+      return (ticket, payload, null);
+    } catch (e) {
+      return (null, null, e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> staffCancelDrinkPosTicket(String ticketId) async {
+    if (!isStaff) return;
+    await _drinkPos.cancelTicket(ticketId);
+  }
+
+  RealtimeChannel? watchDrinkPosTicket({
+    required String ticketId,
+    required void Function(DrinkPosTicket ticket) onUpdate,
+  }) {
+    if (!usesCloud) return null;
+    return _drinkPos.watchTicket(ticketId: ticketId, onUpdate: onUpdate);
+  }
+
+  /// Guest: scan bartender POS QR and settle payment + celebration alert.
+  Future<(DrinkPosPaymentResult?, String?)> payDrinkPosTicket(
+    DrinkPayPayload payload,
+  ) async {
+    if (isStaff) return (null, 'Guests pay this QR.');
+    if (!isInsideClub) {
+      return (null, 'Scan in at the door before paying at the bar.');
+    }
+    if (!payload.isFresh) {
+      return (null, 'Payment QR expired — ask the bartender to start a new order.');
+    }
+
+    try {
+      final result = await _runExclusiveWallet<DrinkPosPaymentResult>(() async {
+        final paid = await _drinkPos.payTicket(payload.ticketId);
+        _user = await _auth.getCurrentUser() ?? _user;
+        if (_session != null && _user != null) {
+          _session!.includedDrinksRemaining = _user!.includedDrinksRemaining;
+          await _sessionStore.upsert(_session!);
+        }
+        await _drinkOrders.refresh();
+        return paid;
+      });
+
+      if (result == null) return (null, 'Wallet busy — try again.');
+
+      final chargeSource = result.chargedSeconds > 0
+          ? DrinkChargeSource.personalTime
+          : DrinkChargeSource.packageAllowance;
+
+      _drinkDeliveryAlertQueue.add(
+        DrinkDeliveryAlert(
+          orderId: result.ticketId,
+          drinkName: result.drinkNames,
+          chargeSource: chargeSource,
+          costSeconds: result.chargedSeconds,
+          balanceBefore: result.balanceBefore,
+          balanceAfter: result.balanceAfter,
+          bartenderName: result.staffName,
+          packageDrinksRemaining: result.packageDrinksAfter,
+        ),
+      );
+      _addFeedEvent('Paid at the bar · ${result.drinkNames}');
+      unawaited(_sounds.playGlassClink());
+      _syncLiveActivity(force: true);
+      notifyListeners();
+      return (result, null);
+    } catch (e) {
+      return (null, e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   /// Allowance units still banked. The profile row is the server's truth, so a

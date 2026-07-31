@@ -377,9 +377,7 @@ export default function LandingPage() {
 
       <header className={`lp-nav${mobileNavOpen ? ' lp-nav--open' : ''}`}>
         <div className="lp-brand">
-          <span className="lp-mark" aria-hidden>
-            虎
-          </span>
+          <img className="lp-mark" src="/app-icon.png" alt="" aria-hidden />
           <span>BLIND TIGER</span>
         </div>
         <button
@@ -451,12 +449,7 @@ export default function LandingPage() {
           <div className="lp-hero-stage" aria-hidden>
             <div className="lp-orb" />
             <div className="lp-emblem">
-              <span className="lp-tiger">虎</span>
-              <div className="lp-claw">
-                <i />
-                <i />
-                <i />
-              </div>
+              <img src="/app-icon.png" alt="" />
             </div>
             <div className="lp-float-card">
               <span className="lp-live-dot" />

@@ -5,6 +5,7 @@ import '../../core/widgets/lattice_background.dart';
 import '../../core/widgets/tiger_motion.dart';
 import '../../data/mock_data.dart';
 import '../../models/blind_tiger_models.dart';
+import '../../models/drink_catalog.dart';
 import '../../models/social_play.dart';
 import '../../providers/app_state.dart';
 import 'add_friend_sheet.dart';
@@ -950,7 +951,7 @@ class MenuTab extends StatelessWidget {
           style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 9),
         ),
         const SizedBox(height: 8),
-        ...MockData.drinks.map((drink) => _DrinkTile(drink: drink)),
+        ...DrinkCatalog.active.map((drink) => _DrinkTile(drink: drink)),
       ],
     );
   }

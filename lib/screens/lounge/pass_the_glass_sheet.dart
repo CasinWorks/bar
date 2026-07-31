@@ -6,6 +6,7 @@ import '../../core/widgets/lattice_background.dart';
 import '../../models/time_gift.dart';
 import '../../providers/app_state.dart';
 import '../../services/time_gift_service.dart';
+import 'pay_bar_sheet.dart';
 import 'tip_bartender_sheet.dart';
 
 enum _GlassTab { raise, tip, claim, bartender }
@@ -219,6 +220,14 @@ class _PassTheGlassSheetState extends State<PassTheGlassSheet> {
                   onTap: () {
                     Navigator.pop(context);
                     TipBartenderSheet.show(context);
+                  },
+                ),
+                _TabChip(
+                  label: 'PAY BAR',
+                  selected: false,
+                  onTap: () {
+                    Navigator.pop(context);
+                    PayBarSheet.show(context);
                   },
                 ),
               ],

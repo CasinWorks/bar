@@ -16,6 +16,7 @@ import HrPage from './pages/HrPage';
 import SafetySocialPage from './pages/SafetySocialPage';
 import BranchesPage from './pages/BranchesPage';
 import DownloadInvitesPage from './pages/DownloadInvitesPage';
+import DrinksPage from './pages/DrinksPage';
 
 function Protected({ children }) {
   const { session, profile, loading, accessError, signOut } = useAuth();
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="platform" element={<PlatformPage />} />
             <Route path="time-load" element={<TimeLoadPage />} />
             <Route path="packages" element={<PackagesPage />} />
+            <Route path="drinks" element={<DrinksPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="events" element={<EventsPage />} />
             <Route path="guests" element={<GuestsPage />} />

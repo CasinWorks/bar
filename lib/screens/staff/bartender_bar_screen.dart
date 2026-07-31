@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/lattice_background.dart';
 import '../../models/drink_order.dart';
 import '../../providers/app_state.dart';
+import 'bartender_pos_screen.dart';
 
 /// Bartender queue — confirm pours and mark drinks delivered.
 class BartenderBarScreen extends StatefulWidget {
@@ -65,6 +66,17 @@ class _BartenderBarScreenState extends State<BartenderBarScreen> {
                         ],
                       ),
                     ),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const BartenderPosScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.point_of_sale, size: 18),
+                      label: const Text('POS'),
+                    ),
                     if (state.isWalletBusy)
                       const SizedBox(
                         width: 18,
@@ -93,10 +105,25 @@ class _BartenderBarScreenState extends State<BartenderBarScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Guest orders will appear here',
+                              'Use POS for bar-side orders, or wait for lounge sends',
+                              textAlign: TextAlign.center,
                               style: Theme.of(
                                 context,
                               ).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const BartenderPosScreen(),
+                                  ),
+                                );
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.crimson,
+                              ),
+                              child: const Text('START ORDER'),
                             ),
                           ],
                         ),

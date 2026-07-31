@@ -294,6 +294,60 @@ class Drink {
 
   bool get isStandard => kind == DrinkKind.standard;
   bool get isPremium => kind == DrinkKind.premium;
+
+  /// Stable catalog key used by POS tickets / drink_orders.drink_id.
+  String get slug => id;
+
+  static DrinkCategory categoryFromString(String? raw) {
+    final value = (raw ?? '').trim().toLowerCase();
+    return switch (value) {
+      'beer' => DrinkCategory.beer,
+      'wine' => DrinkCategory.wine,
+      'nonalcoholic' || 'non-alc' || 'na' || 'mocktail' => DrinkCategory.nonAlc,
+      _ => DrinkCategory.spirits,
+    };
+  }
+
+  factory Drink.fromCatalogRow(Map<String, dynamic> row) {
+    final slug = (row['slug'] as String? ?? '').trim();
+    final name = (row['name'] as String? ?? '').trim();
+    final kindRaw = (row['kind'] as String? ?? 'premium').toLowerCase();
+    final kind = kindRaw == 'standard' ? DrinkKind.standard : DrinkKind.premium;
+    final timeCost = (row['time_cost_seconds'] as num?)?.toInt() ?? 0;
+    final pricePeso = (row['price_peso'] as num?)?.toInt();
+    final ingredientsRaw = row['ingredients'];
+    final ingredients = ingredientsRaw is List
+        ? ingredientsRaw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList()
+        : <String>[];
+
+    String priceLabel;
+    if (kind == DrinkKind.standard && (pricePeso == null || pricePeso <= 0)) {
+      priceLabel = timeCost > 0 ? 'Package / ${timeCost ~/ 60}m' : 'Included';
+    } else if (pricePeso != null) {
+      priceLabel = '₱$pricePeso';
+    } else if (timeCost > 0) {
+      priceLabel = '${timeCost ~/ 60} min';
+    } else {
+      priceLabel = '—';
+    }
+
+    return Drink(
+      id: slug.isNotEmpty ? slug : (row['id']?.toString() ?? name),
+      name: name.isNotEmpty ? name : 'Drink',
+      category: categoryFromString(row['category'] as String?),
+      description: row['description'] as String? ?? '',
+      price: priceLabel,
+      flavor: row['flavor'] as String? ?? '',
+      abv: row['abv'] as String? ?? '',
+      badge: row['badge'] as String?,
+      ingredients: ingredients,
+      bartenderQuote: row['bartender_quote'] as String? ?? '',
+      imageColorStart: (row['image_color_start'] as num?)?.toInt() ?? 0xFFD97706,
+      imageColorEnd: (row['image_color_end'] as num?)?.toInt() ?? 0xFF78350F,
+      timeCostSeconds: timeCost,
+      kind: kind,
+    );
+  }
 }
 
 class MiniGame {

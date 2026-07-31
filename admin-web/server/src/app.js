@@ -12,6 +12,7 @@ import branchesRoutes from './routes/branches.js';
 import packagesRoutes from './routes/packages.js';
 import pushRoutes from './routes/push.js';
 import downloadRoutes from './routes/download.js';
+import drinksRoutes from './routes/drinks.js';
 
 const app = express();
 
@@ -56,6 +57,7 @@ app.use('/api/branches', branchesRoutes);
 app.use('/api/packages', packagesRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/download', downloadRoutes);
+app.use('/api/drinks', drinksRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

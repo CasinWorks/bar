@@ -19,6 +19,7 @@ import '../screens/purchase/buy_time_screen.dart';
 import '../screens/purchase/checkout_screen.dart';
 import '../screens/purchase/pricing_screen.dart';
 import '../screens/staff/bartender_bar_screen.dart';
+import '../screens/staff/bartender_pos_screen.dart';
 import '../screens/staff/bartender_tip_pad_screen.dart';
 import '../screens/staff/door_scanner_screen.dart';
 import '../screens/summary/summary_screen.dart';
@@ -64,7 +65,8 @@ class AppRouter {
         if (app.isStaff) {
           if (loc == '/staff' ||
               loc == '/staff/tip-pad' ||
-              loc == '/staff/bar') {
+              loc == '/staff/bar' ||
+              loc == '/staff/pos') {
             return null;
           }
           return '/staff';
@@ -202,6 +204,10 @@ class AppRouter {
         GoRoute(
           path: '/staff/bar',
           builder: (_, _) => const BartenderBarScreen(),
+        ),
+        GoRoute(
+          path: '/staff/pos',
+          builder: (_, _) => const BartenderPosScreen(),
         ),
       ],
     );
